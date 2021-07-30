@@ -1,0 +1,1211 @@
+// Including Libraries
+#include <windows.h>
+#include <commctrl.h>
+#include <d2d1.h>
+#include <windowsx.h>
+#include <dwrite.h>  
+#include <wingdi.h>
+#include <sapi.h>
+#include <string>
+#include <iostream>
+#include <fstream>
+#include <iomanip>
+#include <nlohmann/json.hpp>
+#include <comutil.h>
+#include <thread>
+
+#include "basewin.h"
+
+#pragma comment(lib, "d2d1")
+#pragma comment(lib, "Dwrite")
+#pragma comment(linker,"\"/manifestdependency:type='win32' \
+name='Microsoft.Windows.Common-Controls' version='6.0.0.0' \
+processorArchitecture='*' publicKeyToken='6595b64144ccf1df' language='*'\"")
+
+// TypeDefs
+
+using json = nlohmann::json;
+using namespace std;
+
+// SafeRelease Function
+
+template <class T> void SafeRelease(T** ppT)
+{
+    if (*ppT)
+    {
+        (*ppT)->Release();
+        *ppT = NULL;
+    }
+}
+
+// Text To Speech
+
+int speakOutput(LPWSTR output)
+{
+    ISpVoice* pVoice = NULL;
+
+    if (FAILED(::CoInitialize(NULL)))
+        return false;
+
+    HRESULT hr = CoCreateInstance(CLSID_SpVoice, NULL, CLSCTX_ALL, IID_ISpVoice, (void**)&pVoice);
+    if (SUCCEEDED(hr))
+    {
+        hr = pVoice->Speak(output, 0, NULL);
+
+        pVoice->Release();
+        pVoice = NULL;
+    }
+    ::CoUninitialize();
+
+    return true;
+}
+
+// Converts Strings To WStrings
+
+wstring s2ws(const string& s)
+{
+    int len;
+    int slength = (int)s.length() + 1;
+    len = MultiByteToWideChar(CP_ACP, 0, s.c_str(), slength, 0, 0);
+    wchar_t* buf = new wchar_t[len];
+    MultiByteToWideChar(CP_ACP, 0, s.c_str(), slength, buf, len);
+    wstring r(buf);
+    delete[] buf;
+    return r;
+}
+
+// Creating MainWindow Class
+
+class MainWindow : public BaseWindow<MainWindow>
+{
+    IDWriteFactory* m_pDWriteFactory;
+    IDWriteTextFormat* m_pTextFormat;
+    IDWriteTextLayout* m_pTextLayout;
+    ID2D1Factory* pFactory;
+    ID2D1HwndRenderTarget* pRenderTarget;
+
+    ID2D1SolidColorBrush* pBrush;
+    ID2D1SolidColorBrush* pBlackBrush;
+    int x;
+    int y;
+
+    HWND hwndButton_wiki;
+    bool wikiFunc;
+    HWND hwndButton_openWeb;
+    bool webFunc;
+    HWND hwndButton_searchGoogle;
+    bool googleFunc;
+
+    HWND hwndInputBox;
+    HDC hdc;
+    PAINTSTRUCT ps;
+    TEXTMETRIC tm;
+
+    HWND hwndEnter;
+    int cTextLen;
+    PSTR pszMem;
+
+    D2D1_RECT_F result_rect;
+
+    int totalnoofshortcuts;
+    HWND d;
+    HWND deleteButton;
+    HWND newShortcut;
+    bool ifNewShortcuts;
+
+    HWND inputName;
+    HWND inputPath;
+    HWND inputSymbol;
+    HWND hwndEnterShortcut;
+    HWND hwndCloseShortcut;
+    bool add;
+
+    HCURSOR hCursor_i = LoadCursor(NULL, IDC_IBEAM);
+    HCURSOR hCursor_arrow = LoadCursor(NULL, IDC_ARROW);
+    HCURSOR hCursor_hand = LoadCursor(NULL, IDC_HAND);
+    HFONT buttonFontA = CreateFont(22,0,0,0,FW_NORMAL,false,false,false,DEFAULT_CHARSET,OUT_OUTLINE_PRECIS,CLIP_DEFAULT_PRECIS,CLEARTYPE_QUALITY,VARIABLE_PITCH,TEXT("Verdana"));
+
+    void    CalculateLayout();
+    HRESULT CreateGraphicsResources();
+    HRESULT CreateDeviceIndependentResources();
+    void    DiscardGraphicsResources();
+    void    DiscardDeviceIndependentResources();
+    void    ShowButtons();
+    void    ArrangeShortcuts();
+    void    ShowNewShortcut();
+    int     GetShortcutPositions(int axis, int item_no, int totalNoOfShortcuts);
+    void    OnPaint();
+    void    Resize();
+    void    SetUpCursor(int xPos, int yPos);
+
+public:
+
+    MainWindow() : pFactory(NULL), pRenderTarget(NULL), pBrush(NULL)
+    {
+    }
+
+    PCWSTR  ClassName() const { return L"Circle Window Class"; }
+    LRESULT HandleMessage(UINT uMsg, WPARAM wParam, LPARAM lParam);
+};
+
+// To Calculate Layout Size
+
+void MainWindow::CalculateLayout()
+{
+    if (pRenderTarget != NULL)
+    {
+        D2D1_SIZE_F size = pRenderTarget->GetSize();
+        x = size.width;
+        y = size.height;
+        result_rect = D2D1::RectF((x / 10), y / 4, x - (x / 10), y - (y / 5));
+    }
+}
+
+// Creating And Deleting Resources
+
+HRESULT MainWindow::CreateGraphicsResources()
+{
+    HRESULT hr = S_OK;
+    if (pRenderTarget == NULL)
+    {
+        RECT rc;
+        GetClientRect(m_hwnd, &rc);
+
+        D2D1_SIZE_U size = D2D1::SizeU(rc.right, rc.bottom);
+
+        hr = pFactory->CreateHwndRenderTarget(
+            D2D1::RenderTargetProperties(),
+            D2D1::HwndRenderTargetProperties(m_hwnd, size),
+            &pRenderTarget);
+
+        if (SUCCEEDED(hr))
+        {
+            const D2D1_COLOR_F color = D2D1::ColorF(0.30, 0.4, 0.44, 1);
+            hr = pRenderTarget->CreateSolidColorBrush(color, &pBrush);
+
+            if (SUCCEEDED(hr))
+            {
+                CalculateLayout();
+                ShowButtons();
+            }
+        }
+    }
+    return hr;
+}
+
+HRESULT MainWindow::CreateDeviceIndependentResources()
+{
+    static const WCHAR msc_fontName[] = L"Verdana";
+    static const FLOAT msc_fontSize = 50;
+    HRESULT hr;
+
+    hr = D2D1CreateFactory(D2D1_FACTORY_TYPE_MULTI_THREADED, &pFactory);
+
+    if (SUCCEEDED(hr))
+    {
+        hr = DWriteCreateFactory(
+            DWRITE_FACTORY_TYPE_SHARED,
+            __uuidof(m_pDWriteFactory),
+            reinterpret_cast<IUnknown**>(&m_pDWriteFactory)
+        );
+    }
+    if (SUCCEEDED(hr))
+    {
+        const D2D1_COLOR_F color = D2D1::ColorF(0.75, 0.75, 0.75, 1);
+        hr = pRenderTarget->CreateSolidColorBrush(color, &pBlackBrush);
+        hr = m_pDWriteFactory->CreateTextFormat(
+            msc_fontName,
+            NULL,
+            DWRITE_FONT_WEIGHT_NORMAL,
+            DWRITE_FONT_STYLE_NORMAL,
+            DWRITE_FONT_STRETCH_NORMAL,
+            msc_fontSize,
+            L"",
+            &m_pTextFormat
+        );
+    }
+    if (SUCCEEDED(hr))
+    {
+        m_pTextFormat->SetTextAlignment(DWRITE_TEXT_ALIGNMENT_CENTER);
+
+        m_pTextFormat->SetParagraphAlignment(DWRITE_PARAGRAPH_ALIGNMENT_CENTER);
+    }
+
+    return hr;
+}
+
+void MainWindow::DiscardGraphicsResources()
+{
+    SafeRelease(&pRenderTarget);
+    SafeRelease(&pBrush);
+}
+
+void MainWindow::DiscardDeviceIndependentResources()
+{
+    SafeRelease(&pFactory);
+    SafeRelease(&m_pDWriteFactory);
+    SafeRelease(&pRenderTarget);
+    SafeRelease(&m_pTextFormat);
+}
+
+// To Show Buttons
+
+void MainWindow::ShowButtons() 
+{
+    hwndButton_wiki = CreateWindowEx(
+        0,
+        L"BUTTON",
+        L"Search Wikipedia",
+        WS_TABSTOP | WS_VISIBLE | WS_CHILD | BS_PUSHBUTTON | BS_FLAT, 
+        x / 30, 
+        y / 40,
+        x / 5,
+        30,
+        m_hwnd,
+        NULL,
+        (HINSTANCE)GetWindowLongPtr(m_hwnd, GWLP_HINSTANCE), 
+        NULL
+    );
+    SetClassLongPtr(hwndButton_wiki, GCL_HCURSOR, (LONG_PTR)hCursor_hand);
+    SendMessage(hwndButton_wiki, WM_SETFONT, (WPARAM)buttonFontA, true);
+
+    hwndButton_openWeb = CreateWindowEx(
+        0,
+        L"BUTTON",
+        L"Open A Link",
+        WS_TABSTOP | WS_VISIBLE | WS_CHILD | BS_PUSHBUTTON | BS_FLAT, 
+        2 * (x / 30) + (2 - 1) * (x / 5),
+        y / 40,
+        x / 5,
+        30,
+        m_hwnd,
+        NULL,
+        (HINSTANCE)GetWindowLongPtr(m_hwnd, GWLP_HINSTANCE), 
+        NULL
+    );
+    SetClassLongPtr(hwndButton_openWeb, GCL_HCURSOR, (LONG_PTR)hCursor_hand);
+    SendMessage(hwndButton_openWeb, WM_SETFONT, (WPARAM)buttonFontA, true);
+
+    hwndButton_searchGoogle = CreateWindowEx(
+        0,
+        L"BUTTON",
+        L"Search Google",
+        WS_TABSTOP | WS_VISIBLE | WS_CHILD | BS_PUSHBUTTON | BS_FLAT, 
+        3 * (x / 30) + (3 - 1) * (x / 5),
+        y / 40,
+        x / 5,
+        30,
+        m_hwnd,
+        NULL,
+        (HINSTANCE)GetWindowLongPtr(m_hwnd, GWLP_HINSTANCE),
+        NULL
+    );
+    SetClassLongPtr(hwndButton_searchGoogle, GCL_HCURSOR, (LONG_PTR)hCursor_hand);
+    SendMessage(hwndButton_searchGoogle, WM_SETFONT, (WPARAM)buttonFontA, true);
+
+    hwndInputBox = CreateWindowEx(
+        0,
+        L"EDIT",
+        L"",
+        WS_BORDER | WS_CHILD | WS_VISIBLE | ES_AUTOHSCROLL,
+        x / 10,
+        y - (y / 10),
+        x - 2 * (x / 10) - x / 8,
+        28,
+        m_hwnd,
+        NULL, 
+        (HINSTANCE)GetWindowLongPtr(m_hwnd, GWLP_HINSTANCE),
+        NULL
+    );
+    SendMessage(hwndInputBox, WM_SETFONT, (WPARAM)buttonFontA, true);
+
+    hwndEnter = CreateWindowEx(
+        0,
+        L"BUTTON",
+        L"Enter",
+        WS_TABSTOP | WS_VISIBLE | WS_CHILD | BS_PUSHBUTTON | BS_FLAT,
+        x / 10 + x - (2 * (x / 10)) - x / 8 + 2.5,
+        y - (y / 10),
+        (x - (2 * result_rect.left) - (x - 2 * (x / 10) - x / 8) - 2.5),
+        28,
+        m_hwnd,
+        NULL,
+        (HINSTANCE)GetWindowLongPtr(m_hwnd, GWLP_HINSTANCE),
+        NULL
+    );
+    SetClassLongPtr(hwndEnter, GCL_HCURSOR, (LONG_PTR)hCursor_hand);
+    SendMessage(hwndEnter, WM_SETFONT, (WPARAM)buttonFontA, true);
+
+    if (ifNewShortcuts == true)
+    {
+        inputName = CreateWindowEx(
+            0,
+            L"EDIT",
+            L"",
+            WS_BORDER | WS_CHILD | WS_VISIBLE | ES_AUTOHSCROLL,
+            result_rect.left + 30,
+            result_rect.top + 30,
+            x - (result_rect.left * 2) - 60,
+            28,
+            m_hwnd,
+            NULL,
+            (HINSTANCE)GetWindowLongPtr(m_hwnd, GWLP_HINSTANCE),
+            NULL
+        );
+        SendMessage(inputName, WM_SETFONT, (WPARAM)buttonFontA, true);
+        Edit_SetCueBannerText(inputName, L"Name Of The Shortcut");
+
+        inputPath = CreateWindowEx(
+            0,
+            L"EDIT",
+            L"",
+            WS_BORDER | WS_CHILD | WS_VISIBLE | ES_AUTOHSCROLL,
+            result_rect.left + 30,
+            result_rect.top + 30 + 28 + 30,
+            x - (result_rect.left * 2) - 60,
+            28,
+            m_hwnd,
+            NULL,
+            (HINSTANCE)GetWindowLongPtr(m_hwnd, GWLP_HINSTANCE),
+            NULL
+        );
+        SendMessage(inputPath, WM_SETFONT, (WPARAM)buttonFontA, true);
+        Edit_SetCueBannerText(inputPath, L"Path/Url");
+
+        inputSymbol = CreateWindowEx(
+            0,
+            L"EDIT",
+            L"",
+            WS_BORDER | WS_CHILD | WS_VISIBLE | ES_AUTOHSCROLL,
+            result_rect.left + 30,
+            result_rect.top + 30 + 28 + 30 + 28 + 30,
+            x - (result_rect.left * 2) - 60,
+            28,
+            m_hwnd,
+            NULL,
+            (HINSTANCE)GetWindowLongPtr(m_hwnd, GWLP_HINSTANCE),
+            NULL
+        );
+        SendMessage(inputSymbol, WM_SETFONT, (WPARAM)buttonFontA, true);
+        Edit_SetCueBannerText(inputSymbol, L"Path Of The Symbol");
+
+        hwndEnterShortcut = CreateWindowEx(
+            0,
+            L"Button",
+            L"Submit",
+            WS_BORDER | WS_CHILD | WS_VISIBLE | ES_AUTOHSCROLL,
+            result_rect.left + 30 + (x - (result_rect.left * 2) - 60) / 3,
+            result_rect.top + 30 + 28 + 30 + 28 + 30 + 28 + 30,
+            (( x - (result_rect.left * 2) - 60 ) / 3)/2,
+            28,
+            m_hwnd,
+            NULL,
+            (HINSTANCE)GetWindowLongPtr(m_hwnd, GWLP_HINSTANCE),
+            NULL
+        );
+        SetClassLongPtr(hwndEnterShortcut, GCL_HCURSOR, (LONG_PTR)hCursor_hand);
+        SendMessage(hwndEnterShortcut, WM_SETFONT, (WPARAM)buttonFontA, true);
+
+        hwndCloseShortcut = CreateWindowEx(
+            0,
+            L"Button",
+            L"Close",
+            WS_BORDER | WS_CHILD | WS_VISIBLE | ES_AUTOHSCROLL,
+            result_rect.left + 30 + (x - (result_rect.left * 2) - 60) / 3 + ((x - (result_rect.left * 2) - 60) / 3) / 2,
+            result_rect.top + 30 + 28 + 30 + 28 + 30 + 28 + 30,
+            ((x - (result_rect.left * 2) - 60) / 3) / 2,
+            28,
+            m_hwnd,
+            NULL,
+            (HINSTANCE)GetWindowLongPtr(m_hwnd, GWLP_HINSTANCE),
+            NULL
+        );
+        SetClassLongPtr(hwndCloseShortcut, GCL_HCURSOR, (LONG_PTR)hCursor_hand);
+        SendMessage(hwndCloseShortcut, WM_SETFONT, (WPARAM)buttonFontA, true);
+    }
+    else
+    {
+        ArrangeShortcuts();
+    }
+}
+
+// This Fucntion Arranges Shorctuts On The ResultRect
+
+void MainWindow::ArrangeShortcuts()
+{
+    ifstream ifs("shortcuts.json");
+    json shortcuts_j = json::parse(ifs);
+
+    string checkNull = "";
+    if (shortcuts_j["name1"].get<string>().compare(checkNull) == 0) {
+        totalnoofshortcuts = 1;
+        add = true;
+    }
+    else if (shortcuts_j["name2"].get<string>().compare(checkNull) == 0) {
+        totalnoofshortcuts = 2;
+        add = true;
+    }
+    else if (shortcuts_j["name3"].get<string>().compare(checkNull) == 0) {
+        totalnoofshortcuts = 3;
+        add = true;
+    }
+    else if (shortcuts_j["name4"].get<string>().compare(checkNull) == 0) {
+        totalnoofshortcuts = 4;
+        add = true;
+    }
+    else if (shortcuts_j["name5"].get<string>().compare(checkNull) == 0) {
+        totalnoofshortcuts = 5;
+        add = true;
+    }
+    else if (shortcuts_j["name6"].get<string>().compare(checkNull) == 0) {
+        totalnoofshortcuts = 6;
+        add = true;
+    }
+    else {
+        add = false;
+        totalnoofshortcuts = 7;
+    }
+   
+    int item_no = 1;
+
+    while (item_no <= totalnoofshortcuts)
+    {
+        if (totalnoofshortcuts >= 7)
+        {
+            totalnoofshortcuts = 6;
+        }
+
+        d = CreateWindowEx(
+            0,
+            L"BUTTON",
+            L"",
+            WS_TABSTOP | WS_VISIBLE | WS_CHILD | BS_PUSHBUTTON | BS_FLAT | BS_BITMAP,
+            GetShortcutPositions(1, item_no, totalnoofshortcuts),
+            GetShortcutPositions(2, item_no, totalnoofshortcuts),
+            80,
+            80,
+            m_hwnd,
+            (HMENU)item_no,     // To Check Which Button Is Pushed
+            (HINSTANCE)GetWindowLongPtr(m_hwnd, GWLP_HINSTANCE),
+            NULL
+        );
+        SetClassLongPtr(hwndEnter, GCL_HCURSOR, (LONG_PTR)hCursor_hand);
+
+        deleteButton = CreateWindowEx(
+            0,
+            L"BUTTON",
+            L"",
+            WS_TABSTOP | WS_VISIBLE | WS_CHILD | BS_PUSHBUTTON | BS_FLAT | BS_BITMAP,
+            GetShortcutPositions(1, item_no, totalnoofshortcuts) + 40 - 10,
+            GetShortcutPositions(2, item_no, totalnoofshortcuts) + 5 + 80,
+            20,
+            20,
+            m_hwnd,
+            (HMENU)(item_no + 10),     // To Check Which Button Is Pushed
+            (HINSTANCE)GetWindowLongPtr(m_hwnd, GWLP_HINSTANCE),
+            NULL);
+
+        HBITMAP hDel = (HBITMAP)LoadImage(NULL, L"delete.bmp", IMAGE_BITMAP, 20, 20, LR_LOADFROMFILE);
+        SendMessage(deleteButton, BM_SETIMAGE, (WPARAM)IMAGE_BITMAP, (LPARAM)hDel);
+
+        if (item_no == totalnoofshortcuts && add != false)
+        {
+            HBITMAP add = (HBITMAP)LoadImage(NULL, L"Add.bmp", IMAGE_BITMAP, 80, 80, LR_LOADFROMFILE);
+            SendMessage(d, BM_SETIMAGE, (WPARAM)IMAGE_BITMAP, (LPARAM)add);
+            DestroyWindow(deleteButton);
+        }
+        else {
+            if (item_no == 1) {
+                string symbol_path = shortcuts_j["symbol1"].get<string>();
+                wstring stemp = s2ws(symbol_path);
+                LPCWSTR result = stemp.c_str();
+                HBITMAP image1 = (HBITMAP)LoadImage(NULL, result, IMAGE_BITMAP, 80, 80, LR_LOADFROMFILE);
+                SendMessage(d, BM_SETIMAGE, (WPARAM)IMAGE_BITMAP, (LPARAM)image1);
+            }
+            if (item_no == 2) {
+                string symbol_path = shortcuts_j["symbol2"].get<string>();
+                wstring stemp = s2ws(symbol_path);
+                LPCWSTR result = stemp.c_str();
+                HBITMAP image1 = (HBITMAP)LoadImage(NULL, result, IMAGE_BITMAP, 80, 80, LR_LOADFROMFILE);
+                SendMessage(d, BM_SETIMAGE, (WPARAM)IMAGE_BITMAP, (LPARAM)image1);
+            }
+            if (item_no == 3) {
+                string symbol_path = shortcuts_j["symbol3"].get<string>();
+                wstring stemp = s2ws(symbol_path);
+                LPCWSTR result = stemp.c_str();
+                HBITMAP image1 = (HBITMAP)LoadImage(NULL, result, IMAGE_BITMAP, 80, 80, LR_LOADFROMFILE);
+                SendMessage(d, BM_SETIMAGE, (WPARAM)IMAGE_BITMAP, (LPARAM)image1);
+            }
+            if (item_no == 4) {
+                string symbol_path = shortcuts_j["symbol4"].get<string>();
+                wstring stemp = s2ws(symbol_path);
+                LPCWSTR result = stemp.c_str();
+                HBITMAP image1 = (HBITMAP)LoadImage(NULL, result, IMAGE_BITMAP, 80, 80, LR_LOADFROMFILE);
+                SendMessage(d, BM_SETIMAGE, (WPARAM)IMAGE_BITMAP, (LPARAM)image1);
+            }
+            if (item_no == 5) {
+                string symbol_path = shortcuts_j["symbol5"].get<string>();
+                wstring stemp = s2ws(symbol_path);
+                LPCWSTR result = stemp.c_str();
+                HBITMAP image1 = (HBITMAP)LoadImage(NULL, result, IMAGE_BITMAP, 80, 80, LR_LOADFROMFILE);
+                SendMessage(d, BM_SETIMAGE, (WPARAM)IMAGE_BITMAP, (LPARAM)image1);
+            }
+            if (item_no == 6) {
+                string symbol_path = shortcuts_j["symbol6"].get<string>();
+                wstring stemp = s2ws(symbol_path);
+                LPCWSTR result = stemp.c_str();
+                HBITMAP image1 = (HBITMAP)LoadImage(NULL, result, IMAGE_BITMAP, 80, 80, LR_LOADFROMFILE);
+                SendMessage(d, BM_SETIMAGE, (WPARAM)IMAGE_BITMAP, (LPARAM)image1);
+            }
+        }
+
+        item_no = item_no + 1;
+    }
+}
+
+// Function To Show Add Shortcut Details
+
+void MainWindow::ShowNewShortcut()
+{
+    DestroyWindow(inputName);
+    DestroyWindow(inputPath);
+    DestroyWindow(inputSymbol);
+    DestroyWindow(hwndEnterShortcut);
+    DestroyWindow(hwndCloseShortcut);
+    DestroyWindow(hwndButton_wiki);
+    DestroyWindow(hwndButton_openWeb);
+    DestroyWindow(hwndButton_searchGoogle);
+    DestroyWindow(hwndInputBox);
+    DestroyWindow(hwndEnter);
+    DestroyWindow(GetDlgItem(m_hwnd, 1));
+    DestroyWindow(GetDlgItem(m_hwnd, 2));
+    DestroyWindow(GetDlgItem(m_hwnd, 3));
+    DestroyWindow(GetDlgItem(m_hwnd, 4));
+    DestroyWindow(GetDlgItem(m_hwnd, 5));
+    DestroyWindow(GetDlgItem(m_hwnd, 6));
+    DestroyWindow(GetDlgItem(m_hwnd, 7));
+    DestroyWindow(GetDlgItem(m_hwnd, 11));
+    DestroyWindow(GetDlgItem(m_hwnd, 12));
+    DestroyWindow(GetDlgItem(m_hwnd, 13));
+    DestroyWindow(GetDlgItem(m_hwnd, 14));
+    DestroyWindow(GetDlgItem(m_hwnd, 15));
+    DestroyWindow(GetDlgItem(m_hwnd, 16));
+    DestroyWindow(GetDlgItem(m_hwnd, 17));
+    ifNewShortcuts = true;
+    ShowButtons();
+}
+
+// This Function Finds Positions Of Different shortcuts
+
+int MainWindow::GetShortcutPositions(int axis, int item_no, int totalnoofshortcuts)
+{
+    // Using a formula to get the value
+    // Margin between buttons = Total space (Exclude buttons) / Total no. of buttons + 1
+
+    int heightOfRect = y - (y / 5) - (y / 4);
+    int widthOfRect = x - (x / 10) - (x / 10);
+
+    int a = (heightOfRect - (80))/(2);   // For Y Axis
+    int b = (widthOfRect - (80 * totalnoofshortcuts)) / (totalnoofshortcuts + 1);   // For X Axis
+    
+    if (axis == 1) 
+    {
+         int d = (x / 10) + (b * item_no) + (80 * (item_no - 1));
+         return d;
+    }
+    else
+    {
+        int f = (y / 4) + (a);
+        return f;
+    }
+}
+
+// On Paint
+
+void MainWindow::OnPaint()
+{
+    HRESULT hr = CreateGraphicsResources();
+    if (SUCCEEDED(hr))
+    {
+        PAINTSTRUCT ps;
+        BeginPaint(m_hwnd, &ps);
+
+        pRenderTarget->BeginDraw();
+
+        pRenderTarget->Clear(D2D1::ColorF(0.15, 0.2, 0.22, 1));
+        pRenderTarget->FillRectangle(result_rect, pBrush);
+
+        hr = pRenderTarget->EndDraw();
+        if (FAILED(hr) || hr == D2DERR_RECREATE_TARGET)
+        {
+            DiscardGraphicsResources();
+        }
+
+        EndPaint(m_hwnd, &ps);
+    }
+}
+
+// Change Positions When Resize
+
+void MainWindow::Resize()
+{
+    if (pRenderTarget != NULL)
+    {
+        RECT rc;
+        GetClientRect(m_hwnd, &rc);
+
+        D2D1_SIZE_U size = D2D1::SizeU(rc.right, rc.bottom);
+
+        pRenderTarget->Resize(size);
+        CalculateLayout();
+        DestroyWindow(inputName);
+        DestroyWindow(inputPath);
+        DestroyWindow(inputSymbol);
+        DestroyWindow(hwndEnterShortcut);
+        DestroyWindow(hwndCloseShortcut);
+        DestroyWindow(hwndButton_wiki);
+        DestroyWindow(hwndButton_openWeb);
+        DestroyWindow(hwndButton_searchGoogle);
+        DestroyWindow(hwndInputBox);
+        DestroyWindow(hwndEnter);
+        DestroyWindow(GetDlgItem(m_hwnd, 1));
+        DestroyWindow(GetDlgItem(m_hwnd, 2));
+        DestroyWindow(GetDlgItem(m_hwnd, 3));
+        DestroyWindow(GetDlgItem(m_hwnd, 4));
+        DestroyWindow(GetDlgItem(m_hwnd, 5));
+        DestroyWindow(GetDlgItem(m_hwnd, 6));
+        DestroyWindow(GetDlgItem(m_hwnd, 7));
+        DestroyWindow(GetDlgItem(m_hwnd, 11));
+        DestroyWindow(GetDlgItem(m_hwnd, 12));
+        DestroyWindow(GetDlgItem(m_hwnd, 13));
+        DestroyWindow(GetDlgItem(m_hwnd, 14));
+        DestroyWindow(GetDlgItem(m_hwnd, 15));
+        DestroyWindow(GetDlgItem(m_hwnd, 16));
+        DestroyWindow(GetDlgItem(m_hwnd, 17));
+        ShowButtons();
+        InvalidateRect(m_hwnd, NULL, false);
+    }
+}
+
+// Sets The Cursor
+
+void MainWindow::SetUpCursor(int xPos,int yPos)
+{
+    if (pRenderTarget != NULL) 
+    {
+        SetCursor(hCursor_arrow);
+    }
+}
+
+// Handles Messages
+
+LRESULT MainWindow::HandleMessage(UINT uMsg, WPARAM wParam, LPARAM lParam)
+{
+    switch (uMsg)
+    {
+    // On Creation 
+    case WM_CREATE:
+    {
+        if (FAILED(D2D1CreateFactory(
+            D2D1_FACTORY_TYPE_SINGLE_THREADED, &pFactory)))
+        {
+            return -1;
+        }
+        thread thread_obj(speakOutput, (LPWSTR)L"Hello, I am your assistant");
+        thread_obj.detach();
+
+        HICON hIcon = (HICON)LoadImage(NULL, L"Assistant.ico", IMAGE_ICON, 0, 0, LR_LOADFROMFILE);
+        SendMessage(m_hwnd, WM_SETICON, ICON_SMALL, (LPARAM)hIcon);
+        SendMessage(m_hwnd, WM_SETICON, ICON_BIG, (LPARAM)hIcon);
+
+        wikiFunc = false;
+        webFunc = false;
+        googleFunc = false;
+        return 0;
+    }
+
+    // On Destruction
+    case WM_DESTROY:
+        DiscardGraphicsResources();
+        DiscardDeviceIndependentResources();
+        SafeRelease(&pFactory);
+        PostQuitMessage(0);
+        return 0;
+
+    // Run The Paint Function
+    case WM_PAINT:
+        OnPaint();
+        return 0;
+
+    // When Close Button Is Clicked
+    case WM_CLOSE:
+        if (MessageBox(m_hwnd, L"Do You Want To Exit.", L"Assistant", MB_OKCANCEL) == IDOK)
+        {
+            DestroyWindow(m_hwnd);
+        }
+        return 0;
+
+    // Sets The Cursor When Mouse Moves
+    case WM_MOUSEMOVE:
+    {
+        int xPos = GET_X_LPARAM(lParam);
+        int yPos = GET_Y_LPARAM(lParam);
+        SetUpCursor(xPos, yPos);
+        return 0;
+    }
+
+    // Mostly Using For Button Clicks
+    case WM_COMMAND:
+    {
+        ifstream ifs("shortcuts.json");
+        json shortcuts_j = json::parse(ifs);
+
+        if (LOWORD(wParam) != totalnoofshortcuts) {
+            if (LOWORD(wParam) == 1)
+            {
+                string path = shortcuts_j["path_url1"].get<string>();
+                wstring stemp_path = s2ws(path);
+                LPCWSTR result = stemp_path.c_str();
+                thread thread_obj(speakOutput, (LPWSTR)L"Opening");
+                thread_obj.detach();
+                ShellExecute(NULL, L"open", result, NULL, NULL, SW_SHOWNORMAL);
+            }
+            else if (LOWORD(wParam) == 2)
+            {
+                string path = shortcuts_j["path_url2"].get<string>();
+                wstring stemp_path = s2ws(path);
+                LPCWSTR result = stemp_path.c_str();
+                thread thread_obj(speakOutput, (LPWSTR)L"Opening");
+                thread_obj.detach();
+                ShellExecute(NULL, L"open", result, NULL, NULL, SW_SHOWNORMAL);
+            }
+            else if (LOWORD(wParam) == 3)
+            {
+                string path = shortcuts_j["path_url3"].get<string>();
+                wstring stemp_path = s2ws(path);
+                LPCWSTR result = stemp_path.c_str();
+                thread thread_obj(speakOutput, (LPWSTR)L"Opening");
+                thread_obj.detach();
+                ShellExecute(NULL, L"open", result, NULL, NULL, SW_SHOWNORMAL);
+            }
+            else if (LOWORD(wParam) == 4)
+            {
+                string path = shortcuts_j["path_url4"].get<string>();
+                wstring stemp_path = s2ws(path);
+                LPCWSTR result = stemp_path.c_str();
+                thread thread_obj(speakOutput, (LPWSTR)L"Opening");
+                thread_obj.detach();
+                ShellExecute(NULL, L"open", result, NULL, NULL, SW_SHOWNORMAL);
+            }
+            else if (LOWORD(wParam) == 5)
+            {
+                string path = shortcuts_j["path_url5"].get<string>();
+                wstring stemp_path = s2ws(path);
+                LPCWSTR result = stemp_path.c_str();
+                thread thread_obj(speakOutput, (LPWSTR)L"Opening");
+                thread_obj.detach();
+                ShellExecute(NULL, L"open", result, NULL, NULL, SW_SHOWNORMAL);
+            }
+            else if (LOWORD(wParam) == 6)
+            {
+                string path = shortcuts_j["path_url6"].get<string>();
+                wstring stemp_path = s2ws(path);
+                LPCWSTR result = stemp_path.c_str();
+                thread thread_obj(speakOutput, (LPWSTR)L"Opening");
+                thread_obj.detach();
+                ShellExecute(NULL, L"open", result, NULL, NULL, SW_SHOWNORMAL);
+            }
+            else
+            {
+
+            }
+        }
+        else
+        {
+            thread thread_obj(speakOutput, (LPWSTR)L"Please provide the specifications");
+            thread_obj.detach();
+
+            ShowNewShortcut();
+        }
+        if (LOWORD(wParam) >= 11)
+        {
+            if (LOWORD(wParam) == 11) {
+                if (MessageBox(m_hwnd, L"Do You Want To Delete The Selected Shortcut.", L"Assistant", MB_OKCANCEL) == IDOK)
+                {
+                    thread thread_obj(speakOutput, (LPWSTR)L"Deleting the selected shortcut");
+                    thread_obj.detach();
+                }
+                else
+                {
+                    thread thread_obj(speakOutput, (LPWSTR)L"Didn't delete anything");
+                    thread_obj.detach();
+                }
+            }
+            else if (LOWORD(wParam) == 12) {
+                if (MessageBox(m_hwnd, L"Do You Want To Delete The Selected Shortcut.", L"Assistant", MB_OKCANCEL) == IDOK)
+                {
+                    thread thread_obj(speakOutput, (LPWSTR)L"Deleting the selected shortcut");
+                    thread_obj.detach();
+                }
+                else
+                {
+                    thread thread_obj(speakOutput, (LPWSTR)L"Didn't delete anything");
+                    thread_obj.detach();
+                }
+            }
+            else if (LOWORD(wParam) == 13) {
+                if (MessageBox(m_hwnd, L"Do You Want To Delete The Selected Shortcut.", L"Assistant", MB_OKCANCEL) == IDOK)
+                {
+                    thread thread_obj(speakOutput, (LPWSTR)L"Deleting the selected shortcut");
+                    thread_obj.detach();
+                }
+                else
+                {
+                    thread thread_obj(speakOutput, (LPWSTR)L"Didn't delete anything");
+                    thread_obj.detach();
+                }
+            }
+            else if (LOWORD(wParam) == 14) {
+                if (MessageBox(m_hwnd, L"Do You Want To Delete The Selected Shortcut.", L"Assistant", MB_OKCANCEL) == IDOK)
+                {
+                    thread thread_obj(speakOutput, (LPWSTR)L"Deleting the selected shortcut");
+                    thread_obj.detach();
+                }
+                else
+                {
+                    thread thread_obj(speakOutput, (LPWSTR)L"Didn't delete anything");
+                    thread_obj.detach();
+                }
+            }
+            else if (LOWORD(wParam) == 15) {
+                if (MessageBox(m_hwnd, L"Do You Want To Delete The Selected Shortcut.", L"Assistant", MB_OKCANCEL) == IDOK)
+                {
+                    thread thread_obj(speakOutput, (LPWSTR)L"Deleting the selected shortcut");
+                    thread_obj.detach();
+                }
+                else
+                {
+                    thread thread_obj(speakOutput, (LPWSTR)L"Didn't delete anything");
+                    thread_obj.detach();
+                }
+            }
+            else if (LOWORD(wParam) == 16) {
+                if (MessageBox(m_hwnd, L"Do You Want To Delete The Selected Shortcut.", L"Assistant", MB_OKCANCEL) == IDOK)
+                {
+                    thread thread_obj(speakOutput, (LPWSTR)L"Deleting the selected shortcut");
+                    thread_obj.detach();
+                }
+                else
+                {
+                    thread thread_obj(speakOutput, (LPWSTR)L"Didn't delete anything");
+                    thread_obj.detach();
+                }
+            }
+            else {
+
+            }
+        }
+        switch (wParam)
+        {
+        case BN_CLICKED:
+            if ((HWND)lParam == hwndButton_wiki)
+            {
+                wikiFunc = true;
+                webFunc = false;
+                googleFunc = false;
+                thread thread_obj(speakOutput, (LPWSTR)L"PLease enter the wikipedia search query");
+                thread_obj.detach();
+            }
+            if ((HWND)lParam == hwndButton_openWeb)
+            {
+                webFunc = true;
+                wikiFunc = false;
+                googleFunc = false;
+                thread thread_obj(speakOutput, (LPWSTR)L"PLease enter the url");
+                thread_obj.detach();
+            }
+            if ((HWND)lParam == hwndButton_searchGoogle)
+            {
+                googleFunc = true;
+                wikiFunc = false;
+                webFunc = false;
+                thread thread_obj(speakOutput, (LPWSTR)L"PLease enter the search query");
+                thread_obj.detach();
+            }
+
+            if ((HWND)lParam == hwndEnter)
+            {
+
+                cTextLen = GetWindowTextLength(hwndInputBox);
+                pszMem = (PSTR)VirtualAlloc((LPVOID)NULL,
+                    (DWORD)(cTextLen + 1), MEM_COMMIT,
+                    PAGE_READWRITE);
+                GetWindowText(hwndInputBox, (LPWSTR)pszMem, cTextLen + 1);
+
+                if (wikiFunc == true)
+                {
+                    wstring link;
+                    wstring w1(L"https://en.wikipedia.org/wiki/");
+                    wstring w2((LPWSTR)pszMem);
+                    link = w1 + w2;
+                    const wchar_t* searchLink = link.c_str();
+                    ShellExecute(NULL, L"open", (LPCWSTR)searchLink, NULL, NULL, SW_SHOWNORMAL);
+                    wikiFunc = false;
+                    webFunc = false;
+                    googleFunc = false;
+                }
+                else if (webFunc == true)
+                {
+                    ShellExecute(NULL, L"open", (LPCWSTR)pszMem, NULL, NULL, SW_SHOWNORMAL);
+                    wikiFunc = false;
+                    webFunc = false;
+                    googleFunc = false;
+                }
+                else if (googleFunc == true)
+                {
+                    wstring link;
+                    wstring w1(L"https://www.google.com/search?q=");
+                    wstring w2((LPWSTR)pszMem);
+                    link = w1 + w2;
+                    const wchar_t* searchLink = link.c_str();
+                    ShellExecute(NULL, L"open", (LPCWSTR)searchLink, NULL, NULL, SW_SHOWNORMAL);
+                    wikiFunc = false;
+                    webFunc = false;
+                    googleFunc = false;
+                }
+                else
+                {
+                    wstring inputWstr((LPWSTR)pszMem);
+                    string inputStr(inputWstr.begin(), inputWstr.end());
+                    transform(inputStr.begin(), inputStr.end(), inputStr.begin(), ::tolower);
+                    string searchStr("search");
+                    string wikiStr("wiki");
+                    string googleStr("google");
+                    string openStr("open");
+                    string linkStr("link");
+
+                    string name1Str = shortcuts_j["name1"].get<string>();
+                    transform(name1Str.begin(), name1Str.end(), name1Str.begin(), ::tolower);
+                    string name2Str = shortcuts_j["name2"].get<string>();
+                    transform(name2Str.begin(), name2Str.end(), name2Str.begin(), ::tolower);
+                    string name3Str = shortcuts_j["name3"].get<string>();
+                    transform(name3Str.begin(), name3Str.end(), name3Str.begin(), ::tolower);
+                    string name4Str = shortcuts_j["name4"].get<string>();
+                    transform(name4Str.begin(), name4Str.end(), name4Str.begin(), ::tolower);
+                    string name5Str = shortcuts_j["name5"].get<string>();
+                    transform(name5Str.begin(), name5Str.end(), name5Str.begin(), ::tolower);
+                    string name6Str = shortcuts_j["name6"].get<string>();
+                    transform(name6Str.begin(), name6Str.end(), name6Str.begin(), ::tolower);
+
+                    if (inputStr.find(searchStr) != string::npos) 
+                    {
+                        if (inputStr.find(googleStr) != string::npos)
+                        {
+                            SendMessage(hwndButton_searchGoogle, BM_CLICK, 0, 0);
+                        }
+                        else if (inputStr.find(wikiStr) != string::npos)
+                        {
+                            SendMessage(hwndButton_wiki, BM_CLICK, 0, 0);
+                        }
+                        else
+                        {
+
+                        }
+                    }
+                    else if (inputStr.find(openStr) != string::npos)
+                    {
+                        if (inputStr.find(linkStr) != string::npos)
+                        {
+                            SendMessage(hwndButton_openWeb, BM_CLICK, 0, 0);
+                        }
+                        else
+                        {
+                            if (inputStr.find(name1Str) != string::npos)
+                            {
+                                SendMessage(GetDlgItem(m_hwnd, 1), BM_CLICK, 0, 0);
+                            }
+                            else if (inputStr.find(name2Str) != string::npos)
+                            {
+                                SendMessage(GetDlgItem(m_hwnd, 2), BM_CLICK, 0, 0);
+                            }
+                            else if (inputStr.find(name3Str) != string::npos)
+                            {
+                                SendMessage(GetDlgItem(m_hwnd, 3), BM_CLICK, 0, 0);
+                            }
+                            else if (inputStr.find(name4Str) != string::npos)
+                            {
+                                SendMessage(GetDlgItem(m_hwnd, 4), BM_CLICK, 0, 0);
+                            }
+                            else if (inputStr.find(name5Str) != string::npos)
+                            {
+                                SendMessage(GetDlgItem(m_hwnd, 5), BM_CLICK, 0, 0);
+                            }
+                            else if (inputStr.find(name6Str) != string::npos)
+                            {
+                                SendMessage(GetDlgItem(m_hwnd, 6), BM_CLICK, 0, 0);
+                            }
+                            else
+                            {
+
+                            }
+                        }
+                    }
+                    else
+                    {
+                        
+                    }
+                }
+            }
+            if ((HWND)lParam == hwndEnterShortcut)
+            {
+                int cTextLenName = GetWindowTextLength(inputName);
+                PSTR pszMemName = (PSTR)VirtualAlloc((LPVOID)NULL,
+                    (DWORD)(cTextLenName + 1), MEM_COMMIT,
+                    PAGE_READWRITE);
+                GetWindowText(inputName, (LPWSTR)pszMemName, cTextLenName + 1);
+                wstring nameW((LPWSTR)pszMemName);
+                string nameS(nameW.begin(), nameW.end());
+
+                int cTextLenPath = GetWindowTextLength(inputPath);
+                PSTR pszMemPath = (PSTR)VirtualAlloc((LPVOID)NULL,
+                    (DWORD)(cTextLenPath + 1), MEM_COMMIT,
+                    PAGE_READWRITE);
+                GetWindowText(inputPath, (LPWSTR)pszMemPath, cTextLenPath + 1);
+                wstring pathW((LPWSTR)pszMemPath);
+                string pathS(pathW.begin(), pathW.end());
+
+                int cTextLenSymbol = GetWindowTextLength(inputSymbol);
+                PSTR pszMemSymbol = (PSTR)VirtualAlloc((LPVOID)NULL,
+                    (DWORD)(cTextLenSymbol + 1), MEM_COMMIT,
+                    PAGE_READWRITE);
+                GetWindowText(inputSymbol, (LPWSTR)pszMemSymbol, cTextLenSymbol + 1);
+                wstring symbolW((LPWSTR)pszMemSymbol);
+                string symbolS(symbolW.begin(), symbolW.end());
+
+                ofstream ob("shortcuts.json");
+
+                if (totalnoofshortcuts == 1) {
+                    shortcuts_j["name1"] = nameS;
+                    shortcuts_j["path_url1"] = pathS;
+                    shortcuts_j["symbol1"] = symbolS;
+                }
+                else if (totalnoofshortcuts == 2) {
+                    shortcuts_j["name2"] = nameS;
+                    shortcuts_j["path_url2"] = pathS;
+                    shortcuts_j["symbol2"] = symbolS;
+                }
+                else if (totalnoofshortcuts == 3) {
+                    shortcuts_j["name3"] = nameS;
+                    shortcuts_j["path_url3"] = pathS;
+                    shortcuts_j["symbol3"] = symbolS;
+                }
+                else if (totalnoofshortcuts == 4) {
+                    shortcuts_j["name4"] = nameS;
+                    shortcuts_j["path_url4"] = pathS;
+                    shortcuts_j["symbol4"] = symbolS;
+                }
+                else if (totalnoofshortcuts == 5) {
+                    shortcuts_j["name5"] = nameS;
+                    shortcuts_j["path_url5"] = pathS;
+                    shortcuts_j["symbol5"] = symbolS;
+                }
+                else if (totalnoofshortcuts == 6) {
+                    shortcuts_j["name6"] = nameS;
+                    shortcuts_j["path_url6"] = pathS;
+                    shortcuts_j["symbol6"] = symbolS;
+                }
+                else {
+
+                }
+                ob << shortcuts_j;
+            }
+            if ((HWND)lParam == hwndCloseShortcut)
+            {
+                ifNewShortcuts = false;
+                DestroyWindow(hwndButton_wiki);
+                DestroyWindow(hwndButton_openWeb);
+                DestroyWindow(hwndButton_searchGoogle);
+                DestroyWindow(hwndInputBox);
+                DestroyWindow(hwndEnter);
+                DestroyWindow(inputName);
+                DestroyWindow(inputPath);
+                DestroyWindow(inputSymbol);
+                DestroyWindow(hwndEnterShortcut);
+                DestroyWindow(hwndCloseShortcut);
+                ShowButtons();
+            }
+        }
+        return 0;
+    }
+
+    case WM_SIZE:
+        Resize();
+        return 0;
+
+    // Sets A Minimum Resize Value
+    case WM_GETMINMAXINFO:
+    {
+        LPMINMAXINFO lpMMI = (LPMINMAXINFO)lParam;
+        lpMMI->ptMinTrackSize.x = 900;
+        lpMMI->ptMinTrackSize.y = 500;
+        return 0;
+    }
+
+    // Sets Edit Box Text Color
+    case WM_CTLCOLOREDIT:
+        SetTextColor((HDC)wParam, RGB(10, 10, 10));
+        return (INT_PTR)GetSysColorBrush(COLOR_WINDOW);
+
+    // Using It To Color Buttons
+    case WM_NOTIFY:
+        switch (((LPNMHDR)lParam)->code)
+        {
+        case NM_CUSTOMDRAW:
+            LPNMCUSTOMDRAW lpnmCD = (LPNMCUSTOMDRAW)lParam;
+
+            switch (lpnmCD->dwDrawStage)
+            {
+            case CDDS_PREPAINT:
+                
+                SetDCBrushColor(lpnmCD->hdc, RGB(9, 155, 189));
+                SetDCPenColor(lpnmCD->hdc, RGB(9, 155, 189));
+                SelectObject(lpnmCD->hdc, GetStockObject(DC_BRUSH));
+                SelectObject(lpnmCD->hdc, GetStockObject(DC_PEN));
+                Rectangle(
+                    lpnmCD->hdc,
+                    lpnmCD->rc.left,
+                    lpnmCD->rc.top,
+                    lpnmCD->rc.right,
+                    lpnmCD->rc.bottom
+                );
+                return true;
+            }
+            return 0;
+        }
+        return 0;
+    }
+    return DefWindowProc(m_hwnd, uMsg, wParam, lParam);
+}
+
+
+// WinMain Function
+int WINAPI wWinMain(HINSTANCE hInstance, HINSTANCE, PWSTR, int nCmdShow)
+{
+    MainWindow win;
+
+    if (!win.Create(L"Assistant", WS_OVERLAPPEDWINDOW))
+    {
+        return 0;
+    }
+
+    ShowWindow(win.Window(), nCmdShow);
+
+    MSG msg = { };
+    while (GetMessage(&msg, NULL, 0, 0))
+    {
+        TranslateMessage(&msg);
+        DispatchMessage(&msg);
+    }
+
+    return 0;
+}
