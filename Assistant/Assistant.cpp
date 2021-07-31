@@ -107,7 +107,7 @@ class MainWindow : public BaseWindow<MainWindow>
 
     D2D1_RECT_F result_rect;
 
-    int totalnoofshortcuts;
+    int totalNoOfShortcuts;
     HWND d;
     HWND deleteButton;
     HWND newShortcut;
@@ -139,6 +139,7 @@ class MainWindow : public BaseWindow<MainWindow>
     void    OnPaint();
     void    Resize();
     void    SetUpCursor(int xPos, int yPos);
+    string  RemoveJsonFeild(int itemNo, int field);
 
 public:
 
@@ -437,41 +438,41 @@ void MainWindow::ArrangeShortcuts()
 {
     string checkNull = "";
     if (shortcuts_data["name1"].get<string>().compare(checkNull) == 0) {
-        totalnoofshortcuts = 1;
+        totalNoOfShortcuts = 1;
         add = true;
     }
     else if (shortcuts_data["name2"].get<string>().compare(checkNull) == 0) {
-        totalnoofshortcuts = 2;
+        totalNoOfShortcuts = 2;
         add = true;
     }
     else if (shortcuts_data["name3"].get<string>().compare(checkNull) == 0) {
-        totalnoofshortcuts = 3;
+        totalNoOfShortcuts = 3;
         add = true;
     }
     else if (shortcuts_data["name4"].get<string>().compare(checkNull) == 0) {
-        totalnoofshortcuts = 4;
+        totalNoOfShortcuts = 4;
         add = true;
     }
     else if (shortcuts_data["name5"].get<string>().compare(checkNull) == 0) {
-        totalnoofshortcuts = 5;
+        totalNoOfShortcuts = 5;
         add = true;
     }
     else if (shortcuts_data["name6"].get<string>().compare(checkNull) == 0) {
-        totalnoofshortcuts = 6;
+        totalNoOfShortcuts = 6;
         add = true;
     }
     else {
         add = false;
-        totalnoofshortcuts = 7;
+        totalNoOfShortcuts = 7;
     }
    
     int item_no = 1;
 
-    while (item_no <= totalnoofshortcuts)
+    while (item_no <= totalNoOfShortcuts)
     {
-        if (totalnoofshortcuts >= 7)
+        if (totalNoOfShortcuts >= 7)
         {
-            totalnoofshortcuts = 6;
+            totalNoOfShortcuts = 6;
         }
 
         d = CreateWindowEx(
@@ -479,8 +480,8 @@ void MainWindow::ArrangeShortcuts()
             L"BUTTON",
             L"",
             WS_TABSTOP | WS_VISIBLE | WS_CHILD | BS_PUSHBUTTON | BS_FLAT | BS_BITMAP,
-            GetShortcutPositions(1, item_no, totalnoofshortcuts),
-            GetShortcutPositions(2, item_no, totalnoofshortcuts),
+            GetShortcutPositions(1, item_no, totalNoOfShortcuts),
+            GetShortcutPositions(2, item_no, totalNoOfShortcuts),
             80,
             80,
             m_hwnd,
@@ -495,8 +496,8 @@ void MainWindow::ArrangeShortcuts()
             L"BUTTON",
             L"",
             WS_TABSTOP | WS_VISIBLE | WS_CHILD | BS_PUSHBUTTON | BS_FLAT | BS_BITMAP,
-            GetShortcutPositions(1, item_no, totalnoofshortcuts) + 40 - 10,
-            GetShortcutPositions(2, item_no, totalnoofshortcuts) + 5 + 80,
+            GetShortcutPositions(1, item_no, totalNoOfShortcuts) + 40 - 10,
+            GetShortcutPositions(2, item_no, totalNoOfShortcuts) + 5 + 80,
             20,
             20,
             m_hwnd,
@@ -507,7 +508,7 @@ void MainWindow::ArrangeShortcuts()
         HBITMAP hDel = (HBITMAP)LoadImage(NULL, L"delete.bmp", IMAGE_BITMAP, 20, 20, LR_LOADFROMFILE);
         SendMessage(deleteButton, BM_SETIMAGE, (WPARAM)IMAGE_BITMAP, (LPARAM)hDel);
 
-        if (item_no == totalnoofshortcuts && add != false)
+        if (item_no == totalNoOfShortcuts && add != false)
         {
             HBITMAP add = (HBITMAP)LoadImage(NULL, L"Add.bmp", IMAGE_BITMAP, 80, 80, LR_LOADFROMFILE);
             SendMessage(d, BM_SETIMAGE, (WPARAM)IMAGE_BITMAP, (LPARAM)add);
@@ -596,7 +597,7 @@ void MainWindow::ShowNewShortcut()
 
 // This Function Finds Positions Of Different shortcuts
 
-int MainWindow::GetShortcutPositions(int axis, int item_no, int totalnoofshortcuts)
+int MainWindow::GetShortcutPositions(int axis, int item_no, int totalNoOfShortcuts)
 {
     // Using a formula to get the value
     // Margin between buttons = Total space (Exclude buttons) / Total no. of buttons + 1
@@ -605,7 +606,7 @@ int MainWindow::GetShortcutPositions(int axis, int item_no, int totalnoofshortcu
     int widthOfRect = x - (x / 10) - (x / 10);
 
     int a = (heightOfRect - (80))/(2);   // For Y Axis
-    int b = (widthOfRect - (80 * totalnoofshortcuts)) / (totalnoofshortcuts + 1);   // For X Axis
+    int b = (widthOfRect - (80 * totalNoOfShortcuts)) / (totalNoOfShortcuts + 1);   // For X Axis
     
     if (axis == 1) 
     {
@@ -696,6 +697,132 @@ void MainWindow::SetUpCursor(int xPos,int yPos)
     }
 }
 
+// To Remove A Json Field
+
+string MainWindow::RemoveJsonFeild(int itemNo, int field)
+{
+    string returnVal;
+
+    if (totalNoOfShortcuts == 1)
+    {
+        
+    }
+    else if (totalNoOfShortcuts == 2)
+    {
+        if (field == 1)
+        {
+            returnVal = shortcuts_data["name1"].get<string>();
+            shortcuts_data["name1"] = "";
+        }
+        if (field == 2)
+        {
+            returnVal = shortcuts_data["path_url1"].get<string>();
+            shortcuts_data["path_url1"] = "";
+        }
+        if (field == 3)
+        {
+            returnVal = shortcuts_data["symbol1"].get<string>();
+            shortcuts_data["symbol1"] = "";
+        }
+    }
+    else if (totalNoOfShortcuts == 3)
+    {
+        if (field == 1)
+        {
+            returnVal = shortcuts_data["name2"].get<string>();
+            shortcuts_data["name2"] = "";
+        }
+        if (field == 2)
+        {
+            returnVal = shortcuts_data["path_url2"].get<string>();
+            shortcuts_data["path_url2"] = "";
+        }
+        if (field == 3)
+        {
+            returnVal = shortcuts_data["symbol2"].get<string>();
+            shortcuts_data["symbol2"] = "";
+        }
+    }
+    else if (totalNoOfShortcuts == 4)
+    {
+        if (field == 1)
+        {
+            returnVal = shortcuts_data["name3"].get<string>();
+            shortcuts_data["name3"] = "";
+        }
+        if (field == 2)
+        {
+            returnVal = shortcuts_data["path_url3"].get<string>();
+            shortcuts_data["path_url3"] = "";
+        }
+        if (field == 3)
+        {
+            returnVal = shortcuts_data["symbol3"].get<string>();
+            shortcuts_data["symbol3"] = "";
+        }
+    }
+    else if (totalNoOfShortcuts == 5)
+    {
+        if (field == 1)
+        {
+            returnVal = shortcuts_data["name4"].get<string>();
+            shortcuts_data["name4"] = "";
+        }
+        if (field == 2)
+        {
+            returnVal = shortcuts_data["path_url4"].get<string>();
+            shortcuts_data["path_url4"] = "";
+        }
+        if (field == 3)
+        {
+            returnVal = shortcuts_data["symbol4"].get<string>();
+            shortcuts_data["symbol4"] = "";
+        }
+    }
+    else if (totalNoOfShortcuts == 6)
+    {
+        if (field == 1)
+        {
+            returnVal = shortcuts_data["name5"].get<string>();
+            shortcuts_data["name1"] = "";
+        }
+        if (field == 2)
+        {
+            returnVal = shortcuts_data["path_url5"].get<string>();
+            shortcuts_data["path_url5"] = "";
+        }
+        if (field == 3)
+        {
+            returnVal = shortcuts_data["symbol5"].get<string>();
+            shortcuts_data["symbol5"] = "";
+        }
+    }
+    else if (totalNoOfShortcuts == 7)
+    {
+        if (field == 1)
+        {
+            returnVal = shortcuts_data["name6"].get<string>();
+            shortcuts_data["name6"] = "";
+        }
+        if (field == 2)
+        {
+            returnVal = shortcuts_data["path_url6"].get<string>();
+            shortcuts_data["path_url6"] = "";
+        }
+        if (field == 3)
+        {
+            returnVal = shortcuts_data["symbol6"].get<string>();
+            shortcuts_data["symbol6"] = "";
+        }
+    }
+    else
+    {
+
+    }
+
+    return returnVal;
+}
+
 // Handles Messages
 
 LRESULT MainWindow::HandleMessage(UINT uMsg, WPARAM wParam, LPARAM lParam)
@@ -760,7 +887,7 @@ LRESULT MainWindow::HandleMessage(UINT uMsg, WPARAM wParam, LPARAM lParam)
     case WM_COMMAND:
     {
 
-        if (LOWORD(wParam) != totalnoofshortcuts) {
+        if (LOWORD(wParam) != totalNoOfShortcuts) {
             if (LOWORD(wParam) == 1)
             {
                 string path = shortcuts_data["path_url1"].get<string>();
@@ -833,11 +960,95 @@ LRESULT MainWindow::HandleMessage(UINT uMsg, WPARAM wParam, LPARAM lParam)
             {
                 thread thread_obj(speakOutput, (LPWSTR)L"Deleting the selected shortcut");
                 thread_obj.detach();
-
-                if (LOWORD(wParam) == 11)
-                {
-
+                if ((LOWORD(wParam) - 10) != totalNoOfShortcuts - 1) {
+                    if (LOWORD(wParam) == 11)
+                    {
+                        shortcuts_data["name1"] = RemoveJsonFeild(1, 1);
+                        shortcuts_data["path_url1"] = RemoveJsonFeild(1, 2);
+                        shortcuts_data["symbol1"] = RemoveJsonFeild(1, 3);
+                    }
+                    if (LOWORD(wParam) == 12)
+                    {
+                        shortcuts_data["name2"] = RemoveJsonFeild(2, 1);
+                        shortcuts_data["path_url2"] = RemoveJsonFeild(2, 2);
+                        shortcuts_data["symbol2"] = RemoveJsonFeild(2, 3);
+                    }
+                    if (LOWORD(wParam) == 13)
+                    {
+                        shortcuts_data["name3"] = RemoveJsonFeild(3, 1);
+                        shortcuts_data["path_url3"] = RemoveJsonFeild(3, 2);
+                        shortcuts_data["symbol3"] = RemoveJsonFeild(3, 3);
+                    }
+                    if (LOWORD(wParam) == 14)
+                    {
+                        shortcuts_data["name4"] = RemoveJsonFeild(4, 1);
+                        shortcuts_data["path_url4"] = RemoveJsonFeild(4, 2);
+                        shortcuts_data["symbol4"] = RemoveJsonFeild(4, 3);
+                    }
+                    if (LOWORD(wParam) == 15)
+                    {
+                        shortcuts_data["name5"] = RemoveJsonFeild(5, 1);
+                        shortcuts_data["path_url5"] = RemoveJsonFeild(5, 2);
+                        shortcuts_data["symbol5"] = RemoveJsonFeild(5, 3);
+                    }
+                    if (LOWORD(wParam) == 16)
+                    {
+                        shortcuts_data["name6"] = RemoveJsonFeild(6, 1);
+                        shortcuts_data["path_url6"] = RemoveJsonFeild(6, 2);
+                        shortcuts_data["symbol6"] = RemoveJsonFeild(6, 3);
+                    }
                 }
+                else
+                {
+                    if (LOWORD(wParam) == 11)
+                    {
+                        shortcuts_data["name1"] = "";
+                        shortcuts_data["path_url1"] = "";
+                        shortcuts_data["symbol1"] = "";
+                    }
+                    if (LOWORD(wParam) == 12)
+                    {
+                        shortcuts_data["name2"] = "";
+                        shortcuts_data["path_url2"] = "";
+                        shortcuts_data["symbol2"] = "";
+                    }
+                    if (LOWORD(wParam) == 13)
+                    {
+                        shortcuts_data["name3"] = "";
+                        shortcuts_data["path_url3"] = "";
+                        shortcuts_data["symbol3"] = "";
+                    }
+                    if (LOWORD(wParam) == 14)
+                    {
+                        shortcuts_data["name4"] = "";
+                        shortcuts_data["path_url4"] = "";
+                        shortcuts_data["symbol4"] = "";
+                    }
+                    if (LOWORD(wParam) == 15)
+                    {
+                        shortcuts_data["name5"] = "";
+                        shortcuts_data["path_url5"] = "";
+                        shortcuts_data["symbol5"] = "";
+                    }
+                    if (LOWORD(wParam) == 16)
+                    {
+                        shortcuts_data["name6"] = "";
+                        shortcuts_data["path_url6"] = "";
+                        shortcuts_data["symbol6"] = "";
+                    }
+                }
+
+                ofstream ob("shortcuts.json");
+                ob << shortcuts_data;
+
+                DestroyWindow(GetDlgItem(m_hwnd, 1));
+                DestroyWindow(GetDlgItem(m_hwnd, 2));
+                DestroyWindow(GetDlgItem(m_hwnd, 3));
+                DestroyWindow(GetDlgItem(m_hwnd, 4));
+                DestroyWindow(GetDlgItem(m_hwnd, 5));
+                DestroyWindow(GetDlgItem(m_hwnd, 6));
+                DestroyWindow(GetDlgItem(m_hwnd, 7));
+                ShowButtons();
             }
             else
             {
@@ -1024,32 +1235,32 @@ LRESULT MainWindow::HandleMessage(UINT uMsg, WPARAM wParam, LPARAM lParam)
 
                 ofstream ob("shortcuts.json");
 
-                if (totalnoofshortcuts == 1) {
+                if (totalNoOfShortcuts == 1) {
                     shortcuts_data["name1"] = nameS;
                     shortcuts_data["path_url1"] = pathS;
                     shortcuts_data["symbol1"] = symbolS;
                 }
-                else if (totalnoofshortcuts == 2) {
+                else if (totalNoOfShortcuts == 2) {
                     shortcuts_data["name2"] = nameS;
                     shortcuts_data["path_url2"] = pathS;
                     shortcuts_data["symbol2"] = symbolS;
                 }
-                else if (totalnoofshortcuts == 3) {
+                else if (totalNoOfShortcuts == 3) {
                     shortcuts_data["name3"] = nameS;
                     shortcuts_data["path_url3"] = pathS;
                     shortcuts_data["symbol3"] = symbolS;
                 }
-                else if (totalnoofshortcuts == 4) {
+                else if (totalNoOfShortcuts == 4) {
                     shortcuts_data["name4"] = nameS;
                     shortcuts_data["path_url4"] = pathS;
                     shortcuts_data["symbol4"] = symbolS;
                 }
-                else if (totalnoofshortcuts == 5) {
+                else if (totalNoOfShortcuts == 5) {
                     shortcuts_data["name5"] = nameS;
                     shortcuts_data["path_url5"] = pathS;
                     shortcuts_data["symbol5"] = symbolS;
                 }
-                else if (totalnoofshortcuts == 6) {
+                else if (totalNoOfShortcuts == 6) {
                     shortcuts_data["name6"] = nameS;
                     shortcuts_data["path_url6"] = pathS;
                     shortcuts_data["symbol6"] = symbolS;
