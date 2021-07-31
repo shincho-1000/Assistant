@@ -125,6 +125,8 @@ class MainWindow : public BaseWindow<MainWindow>
     HCURSOR hCursor_hand = LoadCursor(NULL, IDC_HAND);
     HFONT buttonFontA = CreateFont(22,0,0,0,FW_NORMAL,false,false,false,DEFAULT_CHARSET,OUT_OUTLINE_PRECIS,CLIP_DEFAULT_PRECIS,CLEARTYPE_QUALITY,VARIABLE_PITCH,TEXT("Verdana"));
 
+    json shortcuts_data;
+
     void    CalculateLayout();
     HRESULT CreateGraphicsResources();
     HRESULT CreateDeviceIndependentResources();
@@ -433,31 +435,28 @@ void MainWindow::ShowButtons()
 
 void MainWindow::ArrangeShortcuts()
 {
-    ifstream ifs("shortcuts.json");
-    json shortcuts_j = json::parse(ifs);
-
     string checkNull = "";
-    if (shortcuts_j["name1"].get<string>().compare(checkNull) == 0) {
+    if (shortcuts_data["name1"].get<string>().compare(checkNull) == 0) {
         totalnoofshortcuts = 1;
         add = true;
     }
-    else if (shortcuts_j["name2"].get<string>().compare(checkNull) == 0) {
+    else if (shortcuts_data["name2"].get<string>().compare(checkNull) == 0) {
         totalnoofshortcuts = 2;
         add = true;
     }
-    else if (shortcuts_j["name3"].get<string>().compare(checkNull) == 0) {
+    else if (shortcuts_data["name3"].get<string>().compare(checkNull) == 0) {
         totalnoofshortcuts = 3;
         add = true;
     }
-    else if (shortcuts_j["name4"].get<string>().compare(checkNull) == 0) {
+    else if (shortcuts_data["name4"].get<string>().compare(checkNull) == 0) {
         totalnoofshortcuts = 4;
         add = true;
     }
-    else if (shortcuts_j["name5"].get<string>().compare(checkNull) == 0) {
+    else if (shortcuts_data["name5"].get<string>().compare(checkNull) == 0) {
         totalnoofshortcuts = 5;
         add = true;
     }
-    else if (shortcuts_j["name6"].get<string>().compare(checkNull) == 0) {
+    else if (shortcuts_data["name6"].get<string>().compare(checkNull) == 0) {
         totalnoofshortcuts = 6;
         add = true;
     }
@@ -516,42 +515,42 @@ void MainWindow::ArrangeShortcuts()
         }
         else {
             if (item_no == 1) {
-                string symbol_path = shortcuts_j["symbol1"].get<string>();
+                string symbol_path = shortcuts_data["symbol1"].get<string>();
                 wstring stemp = s2ws(symbol_path);
                 LPCWSTR result = stemp.c_str();
                 HBITMAP image1 = (HBITMAP)LoadImage(NULL, result, IMAGE_BITMAP, 80, 80, LR_LOADFROMFILE);
                 SendMessage(d, BM_SETIMAGE, (WPARAM)IMAGE_BITMAP, (LPARAM)image1);
             }
             if (item_no == 2) {
-                string symbol_path = shortcuts_j["symbol2"].get<string>();
+                string symbol_path = shortcuts_data["symbol2"].get<string>();
                 wstring stemp = s2ws(symbol_path);
                 LPCWSTR result = stemp.c_str();
                 HBITMAP image1 = (HBITMAP)LoadImage(NULL, result, IMAGE_BITMAP, 80, 80, LR_LOADFROMFILE);
                 SendMessage(d, BM_SETIMAGE, (WPARAM)IMAGE_BITMAP, (LPARAM)image1);
             }
             if (item_no == 3) {
-                string symbol_path = shortcuts_j["symbol3"].get<string>();
+                string symbol_path = shortcuts_data["symbol3"].get<string>();
                 wstring stemp = s2ws(symbol_path);
                 LPCWSTR result = stemp.c_str();
                 HBITMAP image1 = (HBITMAP)LoadImage(NULL, result, IMAGE_BITMAP, 80, 80, LR_LOADFROMFILE);
                 SendMessage(d, BM_SETIMAGE, (WPARAM)IMAGE_BITMAP, (LPARAM)image1);
             }
             if (item_no == 4) {
-                string symbol_path = shortcuts_j["symbol4"].get<string>();
+                string symbol_path = shortcuts_data["symbol4"].get<string>();
                 wstring stemp = s2ws(symbol_path);
                 LPCWSTR result = stemp.c_str();
                 HBITMAP image1 = (HBITMAP)LoadImage(NULL, result, IMAGE_BITMAP, 80, 80, LR_LOADFROMFILE);
                 SendMessage(d, BM_SETIMAGE, (WPARAM)IMAGE_BITMAP, (LPARAM)image1);
             }
             if (item_no == 5) {
-                string symbol_path = shortcuts_j["symbol5"].get<string>();
+                string symbol_path = shortcuts_data["symbol5"].get<string>();
                 wstring stemp = s2ws(symbol_path);
                 LPCWSTR result = stemp.c_str();
                 HBITMAP image1 = (HBITMAP)LoadImage(NULL, result, IMAGE_BITMAP, 80, 80, LR_LOADFROMFILE);
                 SendMessage(d, BM_SETIMAGE, (WPARAM)IMAGE_BITMAP, (LPARAM)image1);
             }
             if (item_no == 6) {
-                string symbol_path = shortcuts_j["symbol6"].get<string>();
+                string symbol_path = shortcuts_data["symbol6"].get<string>();
                 wstring stemp = s2ws(symbol_path);
                 LPCWSTR result = stemp.c_str();
                 HBITMAP image1 = (HBITMAP)LoadImage(NULL, result, IMAGE_BITMAP, 80, 80, LR_LOADFROMFILE);
@@ -714,6 +713,9 @@ LRESULT MainWindow::HandleMessage(UINT uMsg, WPARAM wParam, LPARAM lParam)
         thread thread_obj(speakOutput, (LPWSTR)L"Hello, I am your assistant");
         thread_obj.detach();
 
+
+        ifstream ifs("shortcuts.json");
+        shortcuts_data = json::parse(ifs);
         HICON hIcon = (HICON)LoadImage(NULL, L"Assistant.ico", IMAGE_ICON, 0, 0, LR_LOADFROMFILE);
         SendMessage(m_hwnd, WM_SETICON, ICON_SMALL, (LPARAM)hIcon);
         SendMessage(m_hwnd, WM_SETICON, ICON_BIG, (LPARAM)hIcon);
@@ -757,13 +759,11 @@ LRESULT MainWindow::HandleMessage(UINT uMsg, WPARAM wParam, LPARAM lParam)
     // Mostly Using For Button Clicks
     case WM_COMMAND:
     {
-        ifstream ifs("shortcuts.json");
-        json shortcuts_j = json::parse(ifs);
 
         if (LOWORD(wParam) != totalnoofshortcuts) {
             if (LOWORD(wParam) == 1)
             {
-                string path = shortcuts_j["path_url1"].get<string>();
+                string path = shortcuts_data["path_url1"].get<string>();
                 wstring stemp_path = s2ws(path);
                 LPCWSTR result = stemp_path.c_str();
                 thread thread_obj(speakOutput, (LPWSTR)L"Opening");
@@ -772,7 +772,7 @@ LRESULT MainWindow::HandleMessage(UINT uMsg, WPARAM wParam, LPARAM lParam)
             }
             else if (LOWORD(wParam) == 2)
             {
-                string path = shortcuts_j["path_url2"].get<string>();
+                string path = shortcuts_data["path_url2"].get<string>();
                 wstring stemp_path = s2ws(path);
                 LPCWSTR result = stemp_path.c_str();
                 thread thread_obj(speakOutput, (LPWSTR)L"Opening");
@@ -781,7 +781,7 @@ LRESULT MainWindow::HandleMessage(UINT uMsg, WPARAM wParam, LPARAM lParam)
             }
             else if (LOWORD(wParam) == 3)
             {
-                string path = shortcuts_j["path_url3"].get<string>();
+                string path = shortcuts_data["path_url3"].get<string>();
                 wstring stemp_path = s2ws(path);
                 LPCWSTR result = stemp_path.c_str();
                 thread thread_obj(speakOutput, (LPWSTR)L"Opening");
@@ -790,7 +790,7 @@ LRESULT MainWindow::HandleMessage(UINT uMsg, WPARAM wParam, LPARAM lParam)
             }
             else if (LOWORD(wParam) == 4)
             {
-                string path = shortcuts_j["path_url4"].get<string>();
+                string path = shortcuts_data["path_url4"].get<string>();
                 wstring stemp_path = s2ws(path);
                 LPCWSTR result = stemp_path.c_str();
                 thread thread_obj(speakOutput, (LPWSTR)L"Opening");
@@ -799,7 +799,7 @@ LRESULT MainWindow::HandleMessage(UINT uMsg, WPARAM wParam, LPARAM lParam)
             }
             else if (LOWORD(wParam) == 5)
             {
-                string path = shortcuts_j["path_url5"].get<string>();
+                string path = shortcuts_data["path_url5"].get<string>();
                 wstring stemp_path = s2ws(path);
                 LPCWSTR result = stemp_path.c_str();
                 thread thread_obj(speakOutput, (LPWSTR)L"Opening");
@@ -808,7 +808,7 @@ LRESULT MainWindow::HandleMessage(UINT uMsg, WPARAM wParam, LPARAM lParam)
             }
             else if (LOWORD(wParam) == 6)
             {
-                string path = shortcuts_j["path_url6"].get<string>();
+                string path = shortcuts_data["path_url6"].get<string>();
                 wstring stemp_path = s2ws(path);
                 LPCWSTR result = stemp_path.c_str();
                 thread thread_obj(speakOutput, (LPWSTR)L"Opening");
@@ -829,80 +829,20 @@ LRESULT MainWindow::HandleMessage(UINT uMsg, WPARAM wParam, LPARAM lParam)
         }
         if (LOWORD(wParam) >= 11)
         {
-            if (LOWORD(wParam) == 11) {
-                if (MessageBox(m_hwnd, L"Do You Want To Delete The Selected Shortcut.", L"Assistant", MB_OKCANCEL) == IDOK)
-                {
-                    thread thread_obj(speakOutput, (LPWSTR)L"Deleting the selected shortcut");
-                    thread_obj.detach();
-                }
-                else
-                {
-                    thread thread_obj(speakOutput, (LPWSTR)L"Didn't delete anything");
-                    thread_obj.detach();
-                }
-            }
-            else if (LOWORD(wParam) == 12) {
-                if (MessageBox(m_hwnd, L"Do You Want To Delete The Selected Shortcut.", L"Assistant", MB_OKCANCEL) == IDOK)
-                {
-                    thread thread_obj(speakOutput, (LPWSTR)L"Deleting the selected shortcut");
-                    thread_obj.detach();
-                }
-                else
-                {
-                    thread thread_obj(speakOutput, (LPWSTR)L"Didn't delete anything");
-                    thread_obj.detach();
-                }
-            }
-            else if (LOWORD(wParam) == 13) {
-                if (MessageBox(m_hwnd, L"Do You Want To Delete The Selected Shortcut.", L"Assistant", MB_OKCANCEL) == IDOK)
-                {
-                    thread thread_obj(speakOutput, (LPWSTR)L"Deleting the selected shortcut");
-                    thread_obj.detach();
-                }
-                else
-                {
-                    thread thread_obj(speakOutput, (LPWSTR)L"Didn't delete anything");
-                    thread_obj.detach();
-                }
-            }
-            else if (LOWORD(wParam) == 14) {
-                if (MessageBox(m_hwnd, L"Do You Want To Delete The Selected Shortcut.", L"Assistant", MB_OKCANCEL) == IDOK)
-                {
-                    thread thread_obj(speakOutput, (LPWSTR)L"Deleting the selected shortcut");
-                    thread_obj.detach();
-                }
-                else
-                {
-                    thread thread_obj(speakOutput, (LPWSTR)L"Didn't delete anything");
-                    thread_obj.detach();
-                }
-            }
-            else if (LOWORD(wParam) == 15) {
-                if (MessageBox(m_hwnd, L"Do You Want To Delete The Selected Shortcut.", L"Assistant", MB_OKCANCEL) == IDOK)
-                {
-                    thread thread_obj(speakOutput, (LPWSTR)L"Deleting the selected shortcut");
-                    thread_obj.detach();
-                }
-                else
-                {
-                    thread thread_obj(speakOutput, (LPWSTR)L"Didn't delete anything");
-                    thread_obj.detach();
-                }
-            }
-            else if (LOWORD(wParam) == 16) {
-                if (MessageBox(m_hwnd, L"Do You Want To Delete The Selected Shortcut.", L"Assistant", MB_OKCANCEL) == IDOK)
-                {
-                    thread thread_obj(speakOutput, (LPWSTR)L"Deleting the selected shortcut");
-                    thread_obj.detach();
-                }
-                else
-                {
-                    thread thread_obj(speakOutput, (LPWSTR)L"Didn't delete anything");
-                    thread_obj.detach();
-                }
-            }
-            else {
+            if (MessageBox(m_hwnd, L"Do You Want To Delete The Selected Shortcut.", L"Assistant", MB_OKCANCEL) == IDOK)
+            {
+                thread thread_obj(speakOutput, (LPWSTR)L"Deleting the selected shortcut");
+                thread_obj.detach();
 
+                if (LOWORD(wParam) == 11)
+                {
+
+                }
+            }
+            else
+            {
+                thread thread_obj(speakOutput, (LPWSTR)L"Didn't delete anything");
+                thread_obj.detach();
             }
         }
         switch (wParam)
@@ -984,17 +924,17 @@ LRESULT MainWindow::HandleMessage(UINT uMsg, WPARAM wParam, LPARAM lParam)
                     string openStr("open");
                     string linkStr("link");
 
-                    string name1Str = shortcuts_j["name1"].get<string>();
+                    string name1Str = shortcuts_data["name1"].get<string>();
                     transform(name1Str.begin(), name1Str.end(), name1Str.begin(), ::tolower);
-                    string name2Str = shortcuts_j["name2"].get<string>();
+                    string name2Str = shortcuts_data["name2"].get<string>();
                     transform(name2Str.begin(), name2Str.end(), name2Str.begin(), ::tolower);
-                    string name3Str = shortcuts_j["name3"].get<string>();
+                    string name3Str = shortcuts_data["name3"].get<string>();
                     transform(name3Str.begin(), name3Str.end(), name3Str.begin(), ::tolower);
-                    string name4Str = shortcuts_j["name4"].get<string>();
+                    string name4Str = shortcuts_data["name4"].get<string>();
                     transform(name4Str.begin(), name4Str.end(), name4Str.begin(), ::tolower);
-                    string name5Str = shortcuts_j["name5"].get<string>();
+                    string name5Str = shortcuts_data["name5"].get<string>();
                     transform(name5Str.begin(), name5Str.end(), name5Str.begin(), ::tolower);
-                    string name6Str = shortcuts_j["name6"].get<string>();
+                    string name6Str = shortcuts_data["name6"].get<string>();
                     transform(name6Str.begin(), name6Str.end(), name6Str.begin(), ::tolower);
 
                     if (inputStr.find(searchStr) != string::npos) 
@@ -1085,39 +1025,39 @@ LRESULT MainWindow::HandleMessage(UINT uMsg, WPARAM wParam, LPARAM lParam)
                 ofstream ob("shortcuts.json");
 
                 if (totalnoofshortcuts == 1) {
-                    shortcuts_j["name1"] = nameS;
-                    shortcuts_j["path_url1"] = pathS;
-                    shortcuts_j["symbol1"] = symbolS;
+                    shortcuts_data["name1"] = nameS;
+                    shortcuts_data["path_url1"] = pathS;
+                    shortcuts_data["symbol1"] = symbolS;
                 }
                 else if (totalnoofshortcuts == 2) {
-                    shortcuts_j["name2"] = nameS;
-                    shortcuts_j["path_url2"] = pathS;
-                    shortcuts_j["symbol2"] = symbolS;
+                    shortcuts_data["name2"] = nameS;
+                    shortcuts_data["path_url2"] = pathS;
+                    shortcuts_data["symbol2"] = symbolS;
                 }
                 else if (totalnoofshortcuts == 3) {
-                    shortcuts_j["name3"] = nameS;
-                    shortcuts_j["path_url3"] = pathS;
-                    shortcuts_j["symbol3"] = symbolS;
+                    shortcuts_data["name3"] = nameS;
+                    shortcuts_data["path_url3"] = pathS;
+                    shortcuts_data["symbol3"] = symbolS;
                 }
                 else if (totalnoofshortcuts == 4) {
-                    shortcuts_j["name4"] = nameS;
-                    shortcuts_j["path_url4"] = pathS;
-                    shortcuts_j["symbol4"] = symbolS;
+                    shortcuts_data["name4"] = nameS;
+                    shortcuts_data["path_url4"] = pathS;
+                    shortcuts_data["symbol4"] = symbolS;
                 }
                 else if (totalnoofshortcuts == 5) {
-                    shortcuts_j["name5"] = nameS;
-                    shortcuts_j["path_url5"] = pathS;
-                    shortcuts_j["symbol5"] = symbolS;
+                    shortcuts_data["name5"] = nameS;
+                    shortcuts_data["path_url5"] = pathS;
+                    shortcuts_data["symbol5"] = symbolS;
                 }
                 else if (totalnoofshortcuts == 6) {
-                    shortcuts_j["name6"] = nameS;
-                    shortcuts_j["path_url6"] = pathS;
-                    shortcuts_j["symbol6"] = symbolS;
+                    shortcuts_data["name6"] = nameS;
+                    shortcuts_data["path_url6"] = pathS;
+                    shortcuts_data["symbol6"] = symbolS;
                 }
                 else {
 
                 }
-                ob << shortcuts_j;
+                ob << shortcuts_data;
             }
             if ((HWND)lParam == hwndCloseShortcut)
             {
