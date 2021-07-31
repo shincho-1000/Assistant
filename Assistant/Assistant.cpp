@@ -1058,6 +1058,19 @@ LRESULT MainWindow::HandleMessage(UINT uMsg, WPARAM wParam, LPARAM lParam)
 
                 }
                 ob << shortcuts_data;
+
+                ifNewShortcuts = false;
+                DestroyWindow(hwndButton_wiki);
+                DestroyWindow(hwndButton_openWeb);
+                DestroyWindow(hwndButton_searchGoogle);
+                DestroyWindow(hwndInputBox);
+                DestroyWindow(hwndEnter);
+                DestroyWindow(inputName);
+                DestroyWindow(inputPath);
+                DestroyWindow(inputSymbol);
+                DestroyWindow(hwndEnterShortcut);
+                DestroyWindow(hwndCloseShortcut);
+                ShowButtons();
             }
             if ((HWND)lParam == hwndCloseShortcut)
             {
