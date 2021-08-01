@@ -95,6 +95,7 @@ class MainWindow : public BaseWindow<MainWindow>
     bool webFunc;
     HWND hwndButton_searchGoogle;
     bool googleFunc;
+    HWND hwndButton_playmusic;
 
     HWND hwndInputBox;
     HDC hdc;
@@ -305,6 +306,23 @@ void MainWindow::ShowButtons()
     );
     SetClassLongPtr(hwndButton_searchGoogle, GCL_HCURSOR, (LONG_PTR)hCursor_hand);
     SendMessage(hwndButton_searchGoogle, WM_SETFONT, (WPARAM)buttonFontA, true);
+
+    hwndButton_playmusic = CreateWindowEx(
+        0,
+        L"BUTTON",
+        L"Search Google",
+        WS_TABSTOP | WS_VISIBLE | WS_CHILD | BS_PUSHBUTTON | BS_FLAT,
+        3 * (x / 30) + (3 - 1) * (x / 5),
+        y / 40,
+        x / 5,
+        30,
+        m_hwnd,
+        NULL,
+        (HINSTANCE)GetWindowLongPtr(m_hwnd, GWLP_HINSTANCE),
+        NULL
+    );
+    SetClassLongPtr(hwndButton_playmusic, GCL_HCURSOR, (LONG_PTR)hCursor_hand);
+    SendMessage(hwndButton_playmusic, WM_SETFONT, (WPARAM)buttonFontA, true);
 
     hwndInputBox = CreateWindowEx(
         0,
@@ -575,6 +593,7 @@ void MainWindow::ShowNewShortcut()
     DestroyWindow(hwndButton_wiki);
     DestroyWindow(hwndButton_openWeb);
     DestroyWindow(hwndButton_searchGoogle);
+    DestroyWindow(hwndButton_playmusic);
     DestroyWindow(hwndInputBox);
     DestroyWindow(hwndEnter);
     DestroyWindow(GetDlgItem(m_hwnd, 1));
@@ -666,6 +685,7 @@ void MainWindow::Resize()
         DestroyWindow(hwndButton_wiki);
         DestroyWindow(hwndButton_openWeb);
         DestroyWindow(hwndButton_searchGoogle);
+        DestroyWindow(hwndButton_playmusic);
         DestroyWindow(hwndInputBox);
         DestroyWindow(hwndEnter);
         DestroyWindow(GetDlgItem(m_hwnd, 1));
@@ -959,7 +979,9 @@ LRESULT MainWindow::HandleMessage(UINT uMsg, WPARAM wParam, LPARAM lParam)
         }
         if (LOWORD(wParam) >= 11)
         {
-            if (MessageBox(m_hwnd, L"Do You Want To Delete The Selected Shortcut.", L"Assistant", MB_OKCANCEL) == IDOK)
+            thread thread_obj(speakOutput, (LPWSTR)L"Do You Want To Delete The Selected Shortcut ?");
+            thread_obj.detach();
+            if (MessageBox(m_hwnd, L"Do You Want To Delete The Selected Shortcut ?", L"Assistant", MB_OKCANCEL) == IDOK)
             {
                 thread thread_obj(speakOutput, (LPWSTR)L"Deleting the selected shortcut");
                 thread_obj.detach();
@@ -1070,6 +1092,7 @@ LRESULT MainWindow::HandleMessage(UINT uMsg, WPARAM wParam, LPARAM lParam)
                 thread thread_obj(speakOutput, (LPWSTR)L"PLease enter the wikipedia search query");
                 thread_obj.detach();
             }
+
             if ((HWND)lParam == hwndButton_openWeb)
             {
                 webFunc = true;
@@ -1078,6 +1101,7 @@ LRESULT MainWindow::HandleMessage(UINT uMsg, WPARAM wParam, LPARAM lParam)
                 thread thread_obj(speakOutput, (LPWSTR)L"PLease enter the url");
                 thread_obj.detach();
             }
+
             if ((HWND)lParam == hwndButton_searchGoogle)
             {
                 googleFunc = true;
@@ -1085,6 +1109,11 @@ LRESULT MainWindow::HandleMessage(UINT uMsg, WPARAM wParam, LPARAM lParam)
                 webFunc = false;
                 thread thread_obj(speakOutput, (LPWSTR)L"PLease enter the search query");
                 thread_obj.detach();
+            }
+
+            if ((HWND)lParam == hwndButton_playmusic)
+            {
+
             }
 
             if ((HWND)lParam == hwndEnter)
@@ -1137,6 +1166,7 @@ LRESULT MainWindow::HandleMessage(UINT uMsg, WPARAM wParam, LPARAM lParam)
                     string googleStr("google");
                     string openStr("open");
                     string linkStr("link");
+                    string playStr("play music");
 
                     string name1Str = shortcuts_data["name1"].get<string>();
                     transform(name1Str.begin(), name1Str.end(), name1Str.begin(), ::tolower);
@@ -1165,6 +1195,10 @@ LRESULT MainWindow::HandleMessage(UINT uMsg, WPARAM wParam, LPARAM lParam)
                         {
 
                         }
+                    }
+                    else if (inputStr.find(playStr) != string::npos)
+                    {
+                        SendMessage(hwndButton_playmusic, BM_CLICK, 0, 0);
                     }
                     else if (inputStr.find(openStr) != string::npos)
                     {
@@ -1277,6 +1311,7 @@ LRESULT MainWindow::HandleMessage(UINT uMsg, WPARAM wParam, LPARAM lParam)
                 DestroyWindow(hwndButton_wiki);
                 DestroyWindow(hwndButton_openWeb);
                 DestroyWindow(hwndButton_searchGoogle);
+                DestroyWindow(hwndButton_playmusic);
                 DestroyWindow(hwndInputBox);
                 DestroyWindow(hwndEnter);
                 DestroyWindow(inputName);
@@ -1292,6 +1327,7 @@ LRESULT MainWindow::HandleMessage(UINT uMsg, WPARAM wParam, LPARAM lParam)
                 DestroyWindow(hwndButton_wiki);
                 DestroyWindow(hwndButton_openWeb);
                 DestroyWindow(hwndButton_searchGoogle);
+                DestroyWindow(hwndButton_playmusic);
                 DestroyWindow(hwndInputBox);
                 DestroyWindow(hwndEnter);
                 DestroyWindow(inputName);
