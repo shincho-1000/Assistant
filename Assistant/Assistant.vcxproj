@@ -148,13 +148,11 @@
     <ClCompile Include="Assistant.cpp" />
   </ItemGroup>
   <ItemGroup>
-    <ResourceCompile Include="Assistant.rc" />
-  </ItemGroup>
-  <ItemGroup>
     <Image Include="Add.bmp" />
   </ItemGroup>
   <ItemGroup>
     <None Include="packages.config" />
+    <None Include="shortcuts.json" />
     <None Include="ShortcutsData.json" />
   </ItemGroup>
   <Import Project="$(VCTargetsPath)\Microsoft.Cpp.targets" />

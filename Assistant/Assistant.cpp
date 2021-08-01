@@ -310,9 +310,9 @@ void MainWindow::ShowButtons()
     hwndButton_playmusic = CreateWindowEx(
         0,
         L"BUTTON",
-        L"Search Google",
+        L"Play Music",
         WS_TABSTOP | WS_VISIBLE | WS_CHILD | BS_PUSHBUTTON | BS_FLAT,
-        3 * (x / 30) + (3 - 1) * (x / 5),
+        4 * (x / 30) + (4 - 1) * (x / 5),
         y / 40,
         x / 5,
         30,
