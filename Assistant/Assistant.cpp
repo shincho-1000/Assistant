@@ -837,6 +837,7 @@ LRESULT MainWindow::HandleMessage(UINT uMsg, WPARAM wParam, LPARAM lParam)
         {
             return -1;
         }
+
         thread thread_obj(speakOutput, (LPWSTR)L"Hello, I am your assistant");
         thread_obj.detach();
 
@@ -850,6 +851,9 @@ LRESULT MainWindow::HandleMessage(UINT uMsg, WPARAM wParam, LPARAM lParam)
         wikiFunc = false;
         webFunc = false;
         googleFunc = false;
+
+        SystemParametersInfo(SPI_SETBEEP, FALSE, NULL, 0);
+
         return 0;
     }
 
@@ -886,7 +890,6 @@ LRESULT MainWindow::HandleMessage(UINT uMsg, WPARAM wParam, LPARAM lParam)
     // Mostly Using For Button Clicks
     case WM_COMMAND:
     {
-
         if (LOWORD(wParam) != totalNoOfShortcuts) {
             if (LOWORD(wParam) == 1)
             {
