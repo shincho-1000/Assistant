@@ -13,12 +13,13 @@
 #include <nlohmann/json.hpp>
 #include <comutil.h>
 #include <thread>
-#include <shobjidl.h> 
+#include <shobjidl.h>
 
 #include "basewin.h"
 
 #pragma comment(lib, "d2d1")
 #pragma comment(lib, "Dwrite")
+#pragma comment(lib, "winmm.lib")
 #pragma comment(linker,"\"/manifestdependency:type='win32' \
 name='Microsoft.Windows.Common-Controls' version='6.0.0.0' \
 processorArchitecture='*' publicKeyToken='6595b64144ccf1df' language='*'\"")
@@ -61,6 +62,23 @@ int speakOutput(LPWSTR output)
     return true;
 }
 
+// Play Music
+
+int playMusic(LPWSTR file)
+{
+    wstring filePath;
+    wstring w1(L"open \"");
+    wstring w2(file);
+    wstring w3(L"\" type mpegvideo alias mp3");
+    filePath = w1 + w2 + w3;
+    const wchar_t* path = filePath.c_str();
+    mciSendString(path, NULL, 0, NULL);
+    mciSendString(L"play mp3 wait", NULL, 0, NULL);
+    mciSendString(L"close mp3", NULL, 0, NULL);
+
+    return true;
+}
+
 // Converts Strings To WStrings
 
 wstring s2ws(const string& s)
@@ -73,13 +91,6 @@ wstring s2ws(const string& s)
     wstring r(buf);
     delete[] buf;
     return r;
-}
-
-// To Play Music 
-
-void playMusic() 
-{
-
 }
 
 // Creating MainWindow Class
@@ -1132,7 +1143,47 @@ LRESULT MainWindow::HandleMessage(UINT uMsg, WPARAM wParam, LPARAM lParam)
 
             if ((HWND)lParam == hwndButton_playmusic)
             {
+                thread thread_obj(speakOutput, (LPWSTR)L"PLease select the mp3 file");
+                thread_obj.detach();
 
+                HRESULT hr = CoInitializeEx(NULL, COINIT_APARTMENTTHREADED |
+                    COINIT_DISABLE_OLE1DDE);
+                if (SUCCEEDED(hr))
+                {
+                    IFileOpenDialog* pFileOpen;
+
+                    // Create the FileOpenDialog object.
+                    hr = CoCreateInstance(CLSID_FileOpenDialog, NULL, CLSCTX_ALL,
+                        IID_IFileOpenDialog, reinterpret_cast<void**>(&pFileOpen));
+
+                    if (SUCCEEDED(hr))
+                    {
+                        // Show the Open dialog box.
+                        hr = pFileOpen->Show(NULL);
+
+                        // Get the file name from the dialog box.
+                        if (SUCCEEDED(hr))
+                        {
+                            IShellItem* pItem;
+                            hr = pFileOpen->GetResult(&pItem);
+                            if (SUCCEEDED(hr))
+                            {
+                                PWSTR pszMusicFilePath;
+                                hr = pItem->GetDisplayName(SIGDN_FILESYSPATH, &pszMusicFilePath);
+
+                                // Display the file name to the user.
+                                if (SUCCEEDED(hr))
+                                {
+                                    thread thread_obj_music(playMusic, pszMusicFilePath);
+                                    thread_obj_music.detach();
+                                    CoTaskMemFree(pszMusicFilePath);
+                                }
+                                pItem->Release();
+                            }
+                        }
+                        pFileOpen->Release();
+                    }
+                }
             }
 
             if ((HWND)lParam == hwndEnter)
