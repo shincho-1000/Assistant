@@ -13,6 +13,7 @@
 #include <nlohmann/json.hpp>
 #include <comutil.h>
 #include <thread>
+#include <shobjidl.h> 
 
 #include "basewin.h"
 
@@ -74,6 +75,13 @@ wstring s2ws(const string& s)
     return r;
 }
 
+// To Play Music 
+
+void playMusic() 
+{
+
+}
+
 // Creating MainWindow Class
 
 class MainWindow : public BaseWindow<MainWindow>
@@ -117,6 +125,7 @@ class MainWindow : public BaseWindow<MainWindow>
     HWND inputName;
     HWND inputPath;
     HWND inputSymbol;
+    HWND inputSymbolBrowse;
     HWND hwndEnterShortcut;
     HWND hwndCloseShortcut;
     bool add;
@@ -139,7 +148,6 @@ class MainWindow : public BaseWindow<MainWindow>
     int     GetShortcutPositions(int axis, int item_no, int totalNoOfShortcuts);
     void    OnPaint();
     void    Resize();
-    void    SetUpCursor(int xPos, int yPos);
     string  RemoveJsonFeild(int itemNo, int field);
 
 public:
@@ -400,7 +408,7 @@ void MainWindow::ShowButtons()
             WS_BORDER | WS_CHILD | WS_VISIBLE | ES_AUTOHSCROLL,
             result_rect.left + 30,
             result_rect.top + 30 + 28 + 30 + 28 + 30,
-            x - (result_rect.left * 2) - 60,
+            x - (result_rect.left * 2) - 60 - 100,
             28,
             m_hwnd,
             NULL,
@@ -409,6 +417,22 @@ void MainWindow::ShowButtons()
         );
         SendMessage(inputSymbol, WM_SETFONT, (WPARAM)buttonFontA, true);
         Edit_SetCueBannerText(inputSymbol, L"Path Of The Symbol");
+
+        inputSymbolBrowse = CreateWindowEx(
+            0,
+            L"BUTTON",
+            L"Browse",
+            WS_BORDER | WS_CHILD | WS_VISIBLE | ES_AUTOHSCROLL,
+            result_rect.left + 30 + x - (result_rect.left * 2) - 60 - 100,
+            result_rect.top + 30 + 28 + 30 + 28 + 30,
+            100,
+            28,
+            m_hwnd,
+            NULL,
+            (HINSTANCE)GetWindowLongPtr(m_hwnd, GWLP_HINSTANCE),
+            NULL
+        );
+        SendMessage(inputSymbolBrowse, WM_SETFONT, (WPARAM)buttonFontA, true);
 
         hwndEnterShortcut = CreateWindowEx(
             0,
@@ -588,6 +612,7 @@ void MainWindow::ShowNewShortcut()
     DestroyWindow(inputName);
     DestroyWindow(inputPath);
     DestroyWindow(inputSymbol);
+    DestroyWindow(inputSymbolBrowse);
     DestroyWindow(hwndEnterShortcut);
     DestroyWindow(hwndCloseShortcut);
     DestroyWindow(hwndButton_wiki);
@@ -680,6 +705,7 @@ void MainWindow::Resize()
         DestroyWindow(inputName);
         DestroyWindow(inputPath);
         DestroyWindow(inputSymbol);
+        DestroyWindow(inputSymbolBrowse);
         DestroyWindow(hwndEnterShortcut);
         DestroyWindow(hwndCloseShortcut);
         DestroyWindow(hwndButton_wiki);
@@ -704,16 +730,6 @@ void MainWindow::Resize()
         DestroyWindow(GetDlgItem(m_hwnd, 17));
         ShowButtons();
         InvalidateRect(m_hwnd, NULL, false);
-    }
-}
-
-// Sets The Cursor
-
-void MainWindow::SetUpCursor(int xPos,int yPos)
-{
-    if (pRenderTarget != NULL) 
-    {
-        SetCursor(hCursor_arrow);
     }
 }
 
@@ -892,7 +908,7 @@ LRESULT MainWindow::HandleMessage(UINT uMsg, WPARAM wParam, LPARAM lParam)
 
     // When Close Button Is Clicked
     case WM_CLOSE:
-        if (MessageBox(m_hwnd, L"Do You Want To Exit.", L"Assistant", MB_OKCANCEL) == IDOK)
+        if (MessageBox(m_hwnd, L"Do You Want To Exit ?", L"Assistant", MB_OKCANCEL) == IDOK)
         {
             DestroyWindow(m_hwnd);
         }
@@ -903,7 +919,10 @@ LRESULT MainWindow::HandleMessage(UINT uMsg, WPARAM wParam, LPARAM lParam)
     {
         int xPos = GET_X_LPARAM(lParam);
         int yPos = GET_Y_LPARAM(lParam);
-        SetUpCursor(xPos, yPos);
+        if (pRenderTarget != NULL)
+        {
+            SetCursor(hCursor_arrow);
+        }
         return 0;
     }
 
@@ -1244,6 +1263,47 @@ LRESULT MainWindow::HandleMessage(UINT uMsg, WPARAM wParam, LPARAM lParam)
                     }
                 }
             }
+            if ((HWND)lParam == inputSymbolBrowse)
+            {
+                HRESULT hr = CoInitializeEx(NULL, COINIT_APARTMENTTHREADED |
+                    COINIT_DISABLE_OLE1DDE);
+                if (SUCCEEDED(hr))
+                {
+                    IFileOpenDialog* pFileOpen;
+
+                    // Create the FileOpenDialog object.
+                    hr = CoCreateInstance(CLSID_FileOpenDialog, NULL, CLSCTX_ALL,
+                        IID_IFileOpenDialog, reinterpret_cast<void**>(&pFileOpen));
+
+                    if (SUCCEEDED(hr))
+                    {
+                        // Show the Open dialog box.
+                        hr = pFileOpen->Show(NULL);
+
+                        // Get the file name from the dialog box.
+                        if (SUCCEEDED(hr))
+                        {
+                            IShellItem* pItem;
+                            hr = pFileOpen->GetResult(&pItem);
+                            if (SUCCEEDED(hr))
+                            {
+                                PWSTR pszFilePath;
+                                hr = pItem->GetDisplayName(SIGDN_FILESYSPATH, &pszFilePath);
+
+                                // Display the file name to the user.
+                                if (SUCCEEDED(hr))
+                                {
+                                    SendMessage(inputSymbol, WM_SETTEXT, 0, (LPARAM)pszFilePath);
+                                    MessageBoxW(NULL, pszFilePath, L"File Path", MB_OK);
+                                    CoTaskMemFree(pszFilePath);
+                                }
+                                pItem->Release();
+                            }
+                        }
+                        pFileOpen->Release();
+                    }
+                }
+            }
             if ((HWND)lParam == hwndEnterShortcut)
             {
                 int cTextLenName = GetWindowTextLength(inputName);
@@ -1317,6 +1377,7 @@ LRESULT MainWindow::HandleMessage(UINT uMsg, WPARAM wParam, LPARAM lParam)
                 DestroyWindow(inputName);
                 DestroyWindow(inputPath);
                 DestroyWindow(inputSymbol);
+                DestroyWindow(inputSymbolBrowse);
                 DestroyWindow(hwndEnterShortcut);
                 DestroyWindow(hwndCloseShortcut);
                 ShowButtons();
@@ -1333,6 +1394,7 @@ LRESULT MainWindow::HandleMessage(UINT uMsg, WPARAM wParam, LPARAM lParam)
                 DestroyWindow(inputName);
                 DestroyWindow(inputPath);
                 DestroyWindow(inputSymbol);
+                DestroyWindow(inputSymbolBrowse);
                 DestroyWindow(hwndEnterShortcut);
                 DestroyWindow(hwndCloseShortcut);
                 ShowButtons();
