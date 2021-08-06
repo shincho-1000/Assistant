@@ -14,6 +14,7 @@
 #include <comutil.h>
 #include <thread>
 #include <shobjidl.h>
+#include <mfidl.h>
 
 #include "basewin.h"
 
@@ -40,29 +41,9 @@ template <class T> void SafeRelease(T** ppT)
     }
 }
 
-// Text To Speech
-
-int speakOutput(LPWSTR output)
-{
-    ISpVoice* pVoice = NULL;
-
-    if (FAILED(::CoInitialize(NULL)))
-        return false;
-
-    HRESULT hr = CoCreateInstance(CLSID_SpVoice, NULL, CLSCTX_ALL, IID_ISpVoice, (void**)&pVoice);
-    if (SUCCEEDED(hr))
-    {
-        hr = pVoice->Speak(output, 0, NULL);
-
-        pVoice->Release();
-        pVoice = NULL;
-    }
-    ::CoUninitialize();
-
-    return true;
-}
-
 // Play Music
+
+bool musicFunc;
 
 int playMusic(LPWSTR file)
 {
@@ -73,8 +54,81 @@ int playMusic(LPWSTR file)
     filePath = w1 + w2 + w3;
     const wchar_t* path = filePath.c_str();
     mciSendString(path, NULL, 0, NULL);
-    mciSendString(L"play mp3 wait", NULL, 0, NULL);
+    mciSendString(L"play mp3 repeat", NULL, 0, NULL);
+
+    while (musicFunc == true)
+    {
+        
+    }
+
+    musicFunc = false;
     mciSendString(L"close mp3", NULL, 0, NULL);
+
+    return true;
+}
+
+// Time And Greetings
+
+int checkTime(int data) 
+{
+    time_t currentTime;
+    struct tm localTime;
+
+    time(&currentTime);
+    localtime_s(&localTime,&currentTime);
+
+    int hour = localTime.tm_hour;
+    int min = localTime.tm_min;
+    int sec = localTime.tm_sec;
+
+    if (data == 1) {
+        return hour;
+    }
+    else if(data == 2) {
+        return min;
+    }
+    else {
+        return sec;
+    }
+}
+
+LPWSTR greeting()
+{
+    int hour = checkTime(1);
+    int min = checkTime(2);
+
+    if (hour >= 2  && hour <= 12) {
+        return (LPWSTR)L"Good Morning, I am your assistant";
+    }
+    else if (hour >= 12 && hour <= 16) {
+        return (LPWSTR)L"Good Afternoon, I am your assistant";
+    }
+    else {
+        return (LPWSTR)L"Good Evening, I am your assistant";
+    }
+}
+
+// Text To Speech
+
+int speakOutput(LPWSTR output)
+{
+    if (musicFunc == false)
+    {
+        ISpVoice* pVoice = NULL;
+
+        if (FAILED(::CoInitialize(NULL)))
+            return false;
+
+        HRESULT hr = CoCreateInstance(CLSID_SpVoice, NULL, CLSCTX_ALL, IID_ISpVoice, (void**)&pVoice);
+        if (SUCCEEDED(hr))
+        {
+            hr = pVoice->Speak(output, 0, NULL);
+
+            pVoice->Release();
+            pVoice = NULL;
+        }
+        ::CoUninitialize();
+    }
 
     return true;
 }
@@ -115,6 +169,8 @@ class MainWindow : public BaseWindow<MainWindow>
     HWND hwndButton_searchGoogle;
     bool googleFunc;
     HWND hwndButton_playmusic;
+    HWND hwndButton_pausemusic;
+    thread thread_obj_music;
 
     HWND hwndInputBox;
     HDC hdc;
@@ -149,8 +205,6 @@ class MainWindow : public BaseWindow<MainWindow>
     json shortcuts_data;
 
     void    CalculateLayout();
-    HRESULT CreateGraphicsResources();
-    HRESULT CreateDeviceIndependentResources();
     void    DiscardGraphicsResources();
     void    DiscardDeviceIndependentResources();
     void    ShowButtons();
@@ -159,7 +213,12 @@ class MainWindow : public BaseWindow<MainWindow>
     int     GetShortcutPositions(int axis, int item_no, int totalNoOfShortcuts);
     void    OnPaint();
     void    Resize();
+    void    DestroyBasicButtons();
+    void    DestroyShortcuts();
+    void    DestroyNewShortcutsButtons();
     string  RemoveJsonFeild(int itemNo, int field);
+    HRESULT CreateGraphicsResources();
+    HRESULT CreateDeviceIndependentResources();
 
 public:
 
@@ -326,22 +385,44 @@ void MainWindow::ShowButtons()
     SetClassLongPtr(hwndButton_searchGoogle, GCL_HCURSOR, (LONG_PTR)hCursor_hand);
     SendMessage(hwndButton_searchGoogle, WM_SETFONT, (WPARAM)buttonFontA, true);
 
-    hwndButton_playmusic = CreateWindowEx(
-        0,
-        L"BUTTON",
-        L"Play Music",
-        WS_TABSTOP | WS_VISIBLE | WS_CHILD | BS_PUSHBUTTON | BS_FLAT,
-        4 * (x / 30) + (4 - 1) * (x / 5),
-        y / 40,
-        x / 5,
-        30,
-        m_hwnd,
-        NULL,
-        (HINSTANCE)GetWindowLongPtr(m_hwnd, GWLP_HINSTANCE),
-        NULL
-    );
-    SetClassLongPtr(hwndButton_playmusic, GCL_HCURSOR, (LONG_PTR)hCursor_hand);
-    SendMessage(hwndButton_playmusic, WM_SETFONT, (WPARAM)buttonFontA, true);
+    if (musicFunc == false)
+    {
+        hwndButton_playmusic = CreateWindowEx(
+            0,
+            L"BUTTON",
+            L"Play Music",
+            WS_TABSTOP | WS_VISIBLE | WS_CHILD | BS_PUSHBUTTON | BS_FLAT,
+            4 * (x / 30) + (4 - 1) * (x / 5),
+            y / 40,
+            x / 5,
+            30,
+            m_hwnd,
+            NULL,
+            (HINSTANCE)GetWindowLongPtr(m_hwnd, GWLP_HINSTANCE),
+            NULL
+        );
+        SetClassLongPtr(hwndButton_playmusic, GCL_HCURSOR, (LONG_PTR)hCursor_hand);
+        SendMessage(hwndButton_playmusic, WM_SETFONT, (WPARAM)buttonFontA, true);
+    }
+    else
+    {
+        hwndButton_pausemusic = CreateWindowEx(
+            0,
+            L"BUTTON",
+            L"Stop Music",
+            WS_TABSTOP | WS_VISIBLE | WS_CHILD | BS_PUSHBUTTON | BS_FLAT,
+            4 * (x / 30) + (4 - 1) * (x / 5),
+            y / 40,
+            x / 5,
+            30,
+            m_hwnd,
+            NULL,
+            (HINSTANCE)GetWindowLongPtr(m_hwnd, GWLP_HINSTANCE),
+            NULL
+        );
+        SetClassLongPtr(hwndButton_pausemusic, GCL_HCURSOR, (LONG_PTR)hCursor_hand);
+        SendMessage(hwndButton_pausemusic, WM_SETFONT, (WPARAM)buttonFontA, true);
+    }
 
     hwndInputBox = CreateWindowEx(
         0,
@@ -384,7 +465,7 @@ void MainWindow::ShowButtons()
             L"",
             WS_BORDER | WS_CHILD | WS_VISIBLE | ES_AUTOHSCROLL,
             result_rect.left + 30,
-            result_rect.top + 30,
+            result_rect.top + ((y - (y / 5) - (y / 4)) / 5 * 1) - 14,
             x - (result_rect.left * 2) - 60,
             28,
             m_hwnd,
@@ -401,7 +482,7 @@ void MainWindow::ShowButtons()
             L"",
             WS_BORDER | WS_CHILD | WS_VISIBLE | ES_AUTOHSCROLL,
             result_rect.left + 30,
-            result_rect.top + 30 + 28 + 30,
+            result_rect.top + ((y - (y / 5) - (y / 4)) / 5 * 2) - 14,
             x - (result_rect.left * 2) - 60,
             28,
             m_hwnd,
@@ -418,7 +499,7 @@ void MainWindow::ShowButtons()
             L"",
             WS_BORDER | WS_CHILD | WS_VISIBLE | ES_AUTOHSCROLL,
             result_rect.left + 30,
-            result_rect.top + 30 + 28 + 30 + 28 + 30,
+            result_rect.top + ((y - (y / 5) - (y / 4)) / 5 * 3) - 14,
             x - (result_rect.left * 2) - 60 - 100,
             28,
             m_hwnd,
@@ -435,7 +516,7 @@ void MainWindow::ShowButtons()
             L"Browse",
             WS_BORDER | WS_CHILD | WS_VISIBLE | ES_AUTOHSCROLL,
             result_rect.left + 30 + x - (result_rect.left * 2) - 60 - 100,
-            result_rect.top + 30 + 28 + 30 + 28 + 30,
+            result_rect.top + ((y - (y / 5) - (y / 4)) / 5 * 3) - 14,
             100,
             28,
             m_hwnd,
@@ -451,7 +532,7 @@ void MainWindow::ShowButtons()
             L"Submit",
             WS_BORDER | WS_CHILD | WS_VISIBLE | ES_AUTOHSCROLL,
             result_rect.left + 30 + (x - (result_rect.left * 2) - 60) / 3,
-            result_rect.top + 30 + 28 + 30 + 28 + 30 + 28 + 30,
+            result_rect.top + ((y - (y / 5) - (y / 4)) / 5 * 4) - 14,
             (( x - (result_rect.left * 2) - 60 ) / 3)/2,
             28,
             m_hwnd,
@@ -468,7 +549,7 @@ void MainWindow::ShowButtons()
             L"Close",
             WS_BORDER | WS_CHILD | WS_VISIBLE | ES_AUTOHSCROLL,
             result_rect.left + 30 + (x - (result_rect.left * 2) - 60) / 3 + ((x - (result_rect.left * 2) - 60) / 3) / 2,
-            result_rect.top + 30 + 28 + 30 + 28 + 30 + 28 + 30,
+            result_rect.top + ((y - (y / 5) - (y / 4)) / 5 * 4) - 14,
             ((x - (result_rect.left * 2) - 60) / 3) / 2,
             28,
             m_hwnd,
@@ -620,32 +701,9 @@ void MainWindow::ArrangeShortcuts()
 
 void MainWindow::ShowNewShortcut()
 {
-    DestroyWindow(inputName);
-    DestroyWindow(inputPath);
-    DestroyWindow(inputSymbol);
-    DestroyWindow(inputSymbolBrowse);
-    DestroyWindow(hwndEnterShortcut);
-    DestroyWindow(hwndCloseShortcut);
-    DestroyWindow(hwndButton_wiki);
-    DestroyWindow(hwndButton_openWeb);
-    DestroyWindow(hwndButton_searchGoogle);
-    DestroyWindow(hwndButton_playmusic);
-    DestroyWindow(hwndInputBox);
-    DestroyWindow(hwndEnter);
-    DestroyWindow(GetDlgItem(m_hwnd, 1));
-    DestroyWindow(GetDlgItem(m_hwnd, 2));
-    DestroyWindow(GetDlgItem(m_hwnd, 3));
-    DestroyWindow(GetDlgItem(m_hwnd, 4));
-    DestroyWindow(GetDlgItem(m_hwnd, 5));
-    DestroyWindow(GetDlgItem(m_hwnd, 6));
-    DestroyWindow(GetDlgItem(m_hwnd, 7));
-    DestroyWindow(GetDlgItem(m_hwnd, 11));
-    DestroyWindow(GetDlgItem(m_hwnd, 12));
-    DestroyWindow(GetDlgItem(m_hwnd, 13));
-    DestroyWindow(GetDlgItem(m_hwnd, 14));
-    DestroyWindow(GetDlgItem(m_hwnd, 15));
-    DestroyWindow(GetDlgItem(m_hwnd, 16));
-    DestroyWindow(GetDlgItem(m_hwnd, 17));
+    DestroyBasicButtons();
+    DestroyShortcuts();
+    DestroyNewShortcutsButtons();
     ifNewShortcuts = true;
     ShowButtons();
 }
@@ -713,32 +771,9 @@ void MainWindow::Resize()
 
         pRenderTarget->Resize(size);
         CalculateLayout();
-        DestroyWindow(inputName);
-        DestroyWindow(inputPath);
-        DestroyWindow(inputSymbol);
-        DestroyWindow(inputSymbolBrowse);
-        DestroyWindow(hwndEnterShortcut);
-        DestroyWindow(hwndCloseShortcut);
-        DestroyWindow(hwndButton_wiki);
-        DestroyWindow(hwndButton_openWeb);
-        DestroyWindow(hwndButton_searchGoogle);
-        DestroyWindow(hwndButton_playmusic);
-        DestroyWindow(hwndInputBox);
-        DestroyWindow(hwndEnter);
-        DestroyWindow(GetDlgItem(m_hwnd, 1));
-        DestroyWindow(GetDlgItem(m_hwnd, 2));
-        DestroyWindow(GetDlgItem(m_hwnd, 3));
-        DestroyWindow(GetDlgItem(m_hwnd, 4));
-        DestroyWindow(GetDlgItem(m_hwnd, 5));
-        DestroyWindow(GetDlgItem(m_hwnd, 6));
-        DestroyWindow(GetDlgItem(m_hwnd, 7));
-        DestroyWindow(GetDlgItem(m_hwnd, 11));
-        DestroyWindow(GetDlgItem(m_hwnd, 12));
-        DestroyWindow(GetDlgItem(m_hwnd, 13));
-        DestroyWindow(GetDlgItem(m_hwnd, 14));
-        DestroyWindow(GetDlgItem(m_hwnd, 15));
-        DestroyWindow(GetDlgItem(m_hwnd, 16));
-        DestroyWindow(GetDlgItem(m_hwnd, 17));
+        DestroyBasicButtons();
+        DestroyShortcuts();
+        DestroyNewShortcutsButtons();
         ShowButtons();
         InvalidateRect(m_hwnd, NULL, false);
     }
@@ -870,6 +905,48 @@ string MainWindow::RemoveJsonFeild(int itemNo, int field)
     return returnVal;
 }
 
+// Destroying Buttons
+
+void MainWindow::DestroyBasicButtons() 
+{
+    DestroyWindow(hwndButton_wiki);
+    DestroyWindow(hwndButton_openWeb);
+    DestroyWindow(hwndButton_searchGoogle);
+    DestroyWindow(hwndButton_playmusic);
+    DestroyWindow(hwndButton_pausemusic);
+    DestroyWindow(hwndInputBox);
+    DestroyWindow(hwndEnter);
+}
+
+void MainWindow::DestroyShortcuts() 
+{
+    DestroyWindow(GetDlgItem(m_hwnd, 1));
+    DestroyWindow(GetDlgItem(m_hwnd, 2));
+    DestroyWindow(GetDlgItem(m_hwnd, 3));
+    DestroyWindow(GetDlgItem(m_hwnd, 4));
+    DestroyWindow(GetDlgItem(m_hwnd, 5));
+    DestroyWindow(GetDlgItem(m_hwnd, 6));
+    DestroyWindow(GetDlgItem(m_hwnd, 7));
+    DestroyWindow(GetDlgItem(m_hwnd, 11));
+    DestroyWindow(GetDlgItem(m_hwnd, 12));
+    DestroyWindow(GetDlgItem(m_hwnd, 13));
+    DestroyWindow(GetDlgItem(m_hwnd, 14));
+    DestroyWindow(GetDlgItem(m_hwnd, 15));
+    DestroyWindow(GetDlgItem(m_hwnd, 16));
+    DestroyWindow(GetDlgItem(m_hwnd, 17));
+}
+
+void MainWindow::DestroyNewShortcutsButtons()
+{
+
+    DestroyWindow(inputName);
+    DestroyWindow(inputPath);
+    DestroyWindow(inputSymbol);
+    DestroyWindow(inputSymbolBrowse);
+    DestroyWindow(hwndEnterShortcut);
+    DestroyWindow(hwndCloseShortcut);
+}
+
 // Handles Messages
 
 LRESULT MainWindow::HandleMessage(UINT uMsg, WPARAM wParam, LPARAM lParam)
@@ -885,10 +962,6 @@ LRESULT MainWindow::HandleMessage(UINT uMsg, WPARAM wParam, LPARAM lParam)
             return -1;
         }
 
-        thread thread_obj(speakOutput, (LPWSTR)L"Hello, I am your assistant");
-        thread_obj.detach();
-
-
         ifstream ifs("shortcuts.json");
         shortcuts_data = json::parse(ifs);
         HICON hIcon = (HICON)LoadImage(NULL, L"Assistant.ico", IMAGE_ICON, 0, 0, LR_LOADFROMFILE);
@@ -898,8 +971,12 @@ LRESULT MainWindow::HandleMessage(UINT uMsg, WPARAM wParam, LPARAM lParam)
         wikiFunc = false;
         webFunc = false;
         googleFunc = false;
+        musicFunc = false;
 
         SystemParametersInfo(SPI_SETBEEP, FALSE, NULL, 0);
+
+        thread thread_obj_greeting(speakOutput, greeting());
+        thread_obj_greeting.detach();
 
         return 0;
     }
@@ -1096,13 +1173,9 @@ LRESULT MainWindow::HandleMessage(UINT uMsg, WPARAM wParam, LPARAM lParam)
                 ofstream ob("shortcuts.json");
                 ob << shortcuts_data;
 
-                DestroyWindow(GetDlgItem(m_hwnd, 1));
-                DestroyWindow(GetDlgItem(m_hwnd, 2));
-                DestroyWindow(GetDlgItem(m_hwnd, 3));
-                DestroyWindow(GetDlgItem(m_hwnd, 4));
-                DestroyWindow(GetDlgItem(m_hwnd, 5));
-                DestroyWindow(GetDlgItem(m_hwnd, 6));
-                DestroyWindow(GetDlgItem(m_hwnd, 7));
+                DestroyBasicButtons();
+                DestroyShortcuts();
+                DestroyNewShortcutsButtons();
                 ShowButtons();
             }
             else
@@ -1174,8 +1247,13 @@ LRESULT MainWindow::HandleMessage(UINT uMsg, WPARAM wParam, LPARAM lParam)
                                 // Display the file name to the user.
                                 if (SUCCEEDED(hr))
                                 {
-                                    thread thread_obj_music(playMusic, pszMusicFilePath);
+                                    thread_obj_music = thread(playMusic, pszMusicFilePath);
                                     thread_obj_music.detach();
+                                    musicFunc = true;
+                                    DestroyBasicButtons();
+                                    DestroyShortcuts();
+                                    DestroyNewShortcutsButtons();
+                                    ShowButtons();
                                     CoTaskMemFree(pszMusicFilePath);
                                 }
                                 pItem->Release();
@@ -1184,6 +1262,15 @@ LRESULT MainWindow::HandleMessage(UINT uMsg, WPARAM wParam, LPARAM lParam)
                         pFileOpen->Release();
                     }
                 }
+            }
+
+            if ((HWND)lParam == hwndButton_pausemusic)
+            {
+                musicFunc = false;
+                DestroyBasicButtons();
+                DestroyShortcuts();
+                DestroyNewShortcutsButtons();
+                ShowButtons();
             }
 
             if ((HWND)lParam == hwndEnter)
@@ -1419,35 +1506,15 @@ LRESULT MainWindow::HandleMessage(UINT uMsg, WPARAM wParam, LPARAM lParam)
                 ob << shortcuts_data;
 
                 ifNewShortcuts = false;
-                DestroyWindow(hwndButton_wiki);
-                DestroyWindow(hwndButton_openWeb);
-                DestroyWindow(hwndButton_searchGoogle);
-                DestroyWindow(hwndButton_playmusic);
-                DestroyWindow(hwndInputBox);
-                DestroyWindow(hwndEnter);
-                DestroyWindow(inputName);
-                DestroyWindow(inputPath);
-                DestroyWindow(inputSymbol);
-                DestroyWindow(inputSymbolBrowse);
-                DestroyWindow(hwndEnterShortcut);
-                DestroyWindow(hwndCloseShortcut);
+                DestroyBasicButtons();
+                DestroyNewShortcutsButtons();
                 ShowButtons();
             }
             if ((HWND)lParam == hwndCloseShortcut)
             {
                 ifNewShortcuts = false;
-                DestroyWindow(hwndButton_wiki);
-                DestroyWindow(hwndButton_openWeb);
-                DestroyWindow(hwndButton_searchGoogle);
-                DestroyWindow(hwndButton_playmusic);
-                DestroyWindow(hwndInputBox);
-                DestroyWindow(hwndEnter);
-                DestroyWindow(inputName);
-                DestroyWindow(inputPath);
-                DestroyWindow(inputSymbol);
-                DestroyWindow(inputSymbolBrowse);
-                DestroyWindow(hwndEnterShortcut);
-                DestroyWindow(hwndCloseShortcut);
+                DestroyBasicButtons();
+                DestroyNewShortcutsButtons();
                 ShowButtons();
             }
         }
