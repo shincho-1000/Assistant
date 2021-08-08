@@ -14,7 +14,7 @@
 #include <comutil.h>
 #include <thread>
 #include <shobjidl.h>
-#include <mfidl.h>
+#include <future>
 
 #include "basewin.h"
 
@@ -204,13 +204,13 @@ class MainWindow : public BaseWindow<MainWindow>
 
     json shortcuts_data;
 
+    int     GetShortcutPositions(int axis, int item_no, int totalNoOfShortcuts);
     void    CalculateLayout();
     void    DiscardGraphicsResources();
     void    DiscardDeviceIndependentResources();
     void    ShowButtons();
     void    ArrangeShortcuts();
     void    ShowNewShortcut();
-    int     GetShortcutPositions(int axis, int item_no, int totalNoOfShortcuts);
     void    OnPaint();
     void    Resize();
     void    DestroyBasicButtons();
@@ -226,6 +226,7 @@ public:
     {
     }
 
+    void checkChangeInTime();
     PCWSTR  ClassName() const { return L"Circle Window Class"; }
     LRESULT HandleMessage(UINT uMsg, WPARAM wParam, LPARAM lParam);
 };
@@ -278,7 +279,7 @@ HRESULT MainWindow::CreateGraphicsResources()
 HRESULT MainWindow::CreateDeviceIndependentResources()
 {
     static const WCHAR msc_fontName[] = L"Verdana";
-    static const FLOAT msc_fontSize = 50;
+    static const FLOAT msc_fontSize = 15;
     HRESULT hr;
 
     hr = D2D1CreateFactory(D2D1_FACTORY_TYPE_MULTI_THREADED, &pFactory);
@@ -738,6 +739,7 @@ int MainWindow::GetShortcutPositions(int axis, int item_no, int totalNoOfShortcu
 void MainWindow::OnPaint()
 {
     HRESULT hr = CreateGraphicsResources();
+    HRESULT hr_text = CreateDeviceIndependentResources();
     if (SUCCEEDED(hr))
     {
         PAINTSTRUCT ps;
@@ -755,6 +757,62 @@ void MainWindow::OnPaint()
         }
 
         EndPaint(m_hwnd, &ps);
+    }
+
+    if (SUCCEEDED(hr_text))
+    {
+        wstring timeNow;
+        int hour = checkTime(1);
+        int min = checkTime(2);
+        wstring hourStr;
+        wstring minStr;
+        wstring suffix;
+        
+        if (hour > 12) {
+            hourStr = to_wstring(hour - 12);
+            suffix = L" PM";
+        }
+        else {
+            if (hour == 0) {
+                hourStr = to_wstring(12);
+            }
+            else {
+                hourStr = to_wstring(hour);
+            }
+            suffix = L" AM";
+        }
+
+        if (checkTime(2) < 10) {
+            minStr = L"0" + to_wstring(checkTime(2));   
+        }
+        else {
+            minStr = to_wstring(checkTime(2));
+        }
+
+        timeNow = hourStr + L":" + minStr + suffix;
+        const WCHAR* timeWchar = timeNow.c_str();
+
+        pRenderTarget->BeginDraw();
+
+        pRenderTarget->SetTransform(D2D1::Matrix3x2F::Identity());
+
+        D2D1_RECT_F text_rect = D2D1::RectF(10, y - 55, 80, y - 15);
+
+        pRenderTarget->DrawText(
+            timeWchar,
+            9,
+            m_pTextFormat,
+            text_rect,
+            pBlackBrush
+        );
+
+        hr_text = pRenderTarget->EndDraw();
+
+        if (hr_text == D2DERR_RECREATE_TARGET)
+        {
+            hr_text = S_OK;
+            DiscardDeviceIndependentResources();
+        }
     }
 }
 
@@ -947,6 +1005,20 @@ void MainWindow::DestroyNewShortcutsButtons()
     DestroyWindow(hwndCloseShortcut);
 }
 
+void MainWindow::checkChangeInTime()
+{
+    int hour = checkTime(1);
+    int min = checkTime(2);
+    while (true) {
+        int new_min = checkTime(2);
+        if (min != new_min) {
+            hour = checkTime(1);
+            min = checkTime(2);
+            RedrawWindow(m_hwnd, NULL, NULL, RDW_INVALIDATE);
+        }
+    }
+}
+
 // Handles Messages
 
 LRESULT MainWindow::HandleMessage(UINT uMsg, WPARAM wParam, LPARAM lParam)
@@ -972,6 +1044,9 @@ LRESULT MainWindow::HandleMessage(UINT uMsg, WPARAM wParam, LPARAM lParam)
         webFunc = false;
         googleFunc = false;
         musicFunc = false;
+
+        thread thread_obj_time_check(&MainWindow::checkChangeInTime, this);
+        thread_obj_time_check.detach();
 
         SystemParametersInfo(SPI_SETBEEP, FALSE, NULL, 0);
 
