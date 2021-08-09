@@ -1,4 +1,5 @@
 // Including Libraries
+
 #include <windows.h>
 #include <commctrl.h>
 #include <d2d1.h>
@@ -15,7 +16,6 @@
 #include <thread>
 #include <shobjidl.h>
 #include <future>
-
 #include "basewin.h"
 
 #pragma comment(lib, "d2d1")
@@ -97,7 +97,7 @@ LPWSTR greeting()
     int hour = checkTime(1);
     int min = checkTime(2);
 
-    if (hour >= 2  && hour <= 12) {
+    if (hour >= 0  && hour <= 12) {
         return (LPWSTR)L"Good Morning, I am your assistant";
     }
     else if (hour >= 12 && hour <= 16) {
