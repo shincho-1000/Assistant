@@ -46,5 +46,11 @@
     <None Include="shortcuts.json">
       <Filter>Resource Files</Filter>
     </None>
+    <None Include="AlarmsData.json">
+      <Filter>Resource Files</Filter>
+    </None>
+    <None Include="alarms.json">
+      <Filter>Resource Files</Filter>
+    </None>
   </ItemGroup>
 </Project>

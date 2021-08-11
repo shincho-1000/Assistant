@@ -80,15 +80,19 @@ int checkTime(int data)
     int hour = localTime.tm_hour;
     int min = localTime.tm_min;
     int sec = localTime.tm_sec;
+    int day = localTime.tm_wday;
 
     if (data == 1) {
         return hour;
     }
-    else if(data == 2) {
+    else if (data == 2) {
         return min;
     }
-    else {
+    else if (data == 3) {
         return sec;
+    }
+    else {
+        return day;
     }
 }
 
@@ -97,7 +101,7 @@ LPWSTR greeting()
     int hour = checkTime(1);
     int min = checkTime(2);
 
-    if (hour >= 0  && hour <= 12) {
+    if (hour >= 0  && hour < 12) {
         return (LPWSTR)L"Good Morning, I am your assistant";
     }
     else if (hour >= 12 && hour <= 16) {
@@ -185,9 +189,22 @@ class MainWindow : public BaseWindow<MainWindow>
 
     int totalNoOfShortcuts;
     HWND d;
-    HWND deleteButton;
+    HWND deleteButtonShortcuts;
     HWND newShortcut;
     bool ifNewShortcuts;
+
+    HWND alarmButton;
+    HWND dAlarm;
+    int totalNoOfAlarms;
+    bool ifAlarms;
+    bool ifNewAlarms;
+
+    HWND alarmMin;
+    HWND alarmHour;
+    HWND alarmAMPM;
+    HWND alarmRepeat;
+    HWND hwndEnterAlarm;
+    HWND hwndCloseAlram;
 
     HWND inputName;
     HWND inputPath;
@@ -211,6 +228,8 @@ class MainWindow : public BaseWindow<MainWindow>
     void    ShowButtons();
     void    ArrangeShortcuts();
     void    ShowNewShortcut();
+    void    ArrangeAlarms();
+    void    ShowNewAlarm();
     void    OnPaint();
     void    Resize();
     void    DestroyBasicButtons();
@@ -563,6 +582,23 @@ void MainWindow::ShowButtons()
     }
     else
     {
+        alarmButton = CreateWindowEx(
+            0,
+            L"BUTTON",
+            L"",
+            WS_TABSTOP | WS_VISIBLE | WS_CHILD | BS_PUSHBUTTON | BS_FLAT | BS_BITMAP,
+            result_rect.left + 10,
+            result_rect.top + 10,
+            40,
+            40,
+            m_hwnd,
+            NULL,
+            (HINSTANCE)GetWindowLongPtr(m_hwnd, GWLP_HINSTANCE),
+            NULL);
+
+        HBITMAP hAlarm = (HBITMAP)LoadImage(NULL, L"clock.bmp", IMAGE_BITMAP, 40, 40, LR_LOADFROMFILE);
+        SendMessage(alarmButton, BM_SETIMAGE, (WPARAM)IMAGE_BITMAP, (LPARAM)hAlarm);
+
         ArrangeShortcuts();
     }
 }
@@ -626,7 +662,7 @@ void MainWindow::ArrangeShortcuts()
         );
         SetClassLongPtr(hwndEnter, GCL_HCURSOR, (LONG_PTR)hCursor_hand);
 
-        deleteButton = CreateWindowEx(
+        deleteButtonShortcuts = CreateWindowEx(
             0,
             L"BUTTON",
             L"",
@@ -641,13 +677,13 @@ void MainWindow::ArrangeShortcuts()
             NULL);
 
         HBITMAP hDel = (HBITMAP)LoadImage(NULL, L"delete.bmp", IMAGE_BITMAP, 20, 20, LR_LOADFROMFILE);
-        SendMessage(deleteButton, BM_SETIMAGE, (WPARAM)IMAGE_BITMAP, (LPARAM)hDel);
+        SendMessage(deleteButtonShortcuts, BM_SETIMAGE, (WPARAM)IMAGE_BITMAP, (LPARAM)hDel);
 
         if (item_no == totalNoOfShortcuts && add != false)
         {
             HBITMAP add = (HBITMAP)LoadImage(NULL, L"Add.bmp", IMAGE_BITMAP, 80, 80, LR_LOADFROMFILE);
             SendMessage(d, BM_SETIMAGE, (WPARAM)IMAGE_BITMAP, (LPARAM)add);
-            DestroyWindow(deleteButton);
+            DestroyWindow(deleteButtonShortcuts);
         }
         else {
             if (item_no == 1) {
@@ -714,7 +750,7 @@ void MainWindow::ShowNewShortcut()
 int MainWindow::GetShortcutPositions(int axis, int item_no, int totalNoOfShortcuts)
 {
     // Using a formula to get the value
-    // Margin between buttons = Total space (Exclude buttons) / Total no. of buttons + 1
+    // Margin between buttons = Total empty space (Excluding buttons) / Total no. of buttons + 1
 
     int heightOfRect = y - (y / 5) - (y / 4);
     int widthOfRect = x - (x / 10) - (x / 10);
@@ -739,7 +775,7 @@ int MainWindow::GetShortcutPositions(int axis, int item_no, int totalNoOfShortcu
 void MainWindow::OnPaint()
 {
     HRESULT hr = CreateGraphicsResources();
-    HRESULT hr_text = CreateDeviceIndependentResources();
+    
     if (SUCCEEDED(hr))
     {
         PAINTSTRUCT ps;
@@ -758,6 +794,8 @@ void MainWindow::OnPaint()
 
         EndPaint(m_hwnd, &ps);
     }
+
+    HRESULT hr_text = CreateDeviceIndependentResources();
 
     if (SUCCEEDED(hr_text))
     {
@@ -992,6 +1030,7 @@ void MainWindow::DestroyShortcuts()
     DestroyWindow(GetDlgItem(m_hwnd, 15));
     DestroyWindow(GetDlgItem(m_hwnd, 16));
     DestroyWindow(GetDlgItem(m_hwnd, 17));
+    DestroyWindow(alarmButton);
 }
 
 void MainWindow::DestroyNewShortcutsButtons()
@@ -1348,6 +1387,11 @@ LRESULT MainWindow::HandleMessage(UINT uMsg, WPARAM wParam, LPARAM lParam)
                 ShowButtons();
             }
 
+            if ((HWND)lParam == alarmButton) 
+            {
+
+            }
+
             if ((HWND)lParam == hwndEnter)
             {
 
@@ -1651,7 +1695,7 @@ int WINAPI wWinMain(HINSTANCE hInstance, HINSTANCE, PWSTR, int nCmdShow)
 {
     MainWindow win;
 
-    if (!win.Create(L"Assistant", WS_OVERLAPPEDWINDOW))
+    if (!win.Create(L"Assistant", WS_OVERLAPPEDWINDOW | WS_CLIPCHILDREN))
     {
         return 0;
     }
