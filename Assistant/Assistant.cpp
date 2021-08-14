@@ -1,5 +1,4 @@
 // Including Libraries
-
 #include <windows.h>
 #include <commctrl.h>
 #include <d2d1.h>
@@ -193,18 +192,19 @@ class MainWindow : public BaseWindow<MainWindow>
     HWND newShortcut;
     bool ifNewShortcuts;
 
+    int totalNoOfAlarms;
     HWND alarmButton;
     HWND dAlarm;
-    int totalNoOfAlarms;
-    bool ifAlarms;
+    HWND newAlarm;
     bool ifNewAlarms;
 
     HWND alarmMin;
     HWND alarmHour;
     HWND alarmAMPM;
+    HWND alarmDay;
     HWND alarmRepeat;
     HWND hwndEnterAlarm;
-    HWND hwndCloseAlram;
+    HWND hwndCloseAlarm;
 
     HWND inputName;
     HWND inputPath;
@@ -220,8 +220,10 @@ class MainWindow : public BaseWindow<MainWindow>
     HFONT buttonFontA = CreateFont(22,0,0,0,FW_NORMAL,false,false,false,DEFAULT_CHARSET,OUT_OUTLINE_PRECIS,CLIP_DEFAULT_PRECIS,CLEARTYPE_QUALITY,VARIABLE_PITCH,TEXT("Verdana"));
 
     json shortcuts_data;
+    json alarms_data;
 
     int     GetShortcutPositions(int axis, int item_no, int totalNoOfShortcuts);
+    int     GetAlarmPositions(int axis, int item_no, int totalNoOfAlarms);
     void    CalculateLayout();
     void    DiscardGraphicsResources();
     void    DiscardDeviceIndependentResources();
@@ -229,13 +231,15 @@ class MainWindow : public BaseWindow<MainWindow>
     void    ArrangeShortcuts();
     void    ShowNewShortcut();
     void    ArrangeAlarms();
-    void    ShowNewAlarm();
+    void    ShowAlarm();
     void    OnPaint();
     void    Resize();
     void    DestroyBasicButtons();
     void    DestroyShortcuts();
     void    DestroyNewShortcutsButtons();
+    void    DestroyAlarmsButtons();
     string  RemoveJsonFeild(int itemNo, int field);
+    string  RemoveJsonFeildAl(int itemNo, int field);
     HRESULT CreateGraphicsResources();
     HRESULT CreateDeviceIndependentResources();
 
@@ -580,6 +584,145 @@ void MainWindow::ShowButtons()
         SetClassLongPtr(hwndCloseShortcut, GCL_HCURSOR, (LONG_PTR)hCursor_hand);
         SendMessage(hwndCloseShortcut, WM_SETFONT, (WPARAM)buttonFontA, true);
     }
+    else if (ifNewAlarms==true) 
+    {
+        hwndEnterAlarm = CreateWindowEx(
+            0,
+            L"Button",
+            L"Submit",
+            WS_BORDER | WS_CHILD | WS_VISIBLE | ES_AUTOHSCROLL,
+            result_rect.right - 10 - (((x - (result_rect.left * 2) - 60) / 3) / 4) - (((x - (result_rect.left * 2) - 60) / 3) / 4),
+            result_rect.bottom - 38,
+            ((x - (result_rect.left * 2) - 60) / 3) / 2,
+            28,
+            m_hwnd,
+            NULL,
+            (HINSTANCE)GetWindowLongPtr(m_hwnd, GWLP_HINSTANCE),
+            NULL
+        );
+        SetClassLongPtr(hwndEnterAlarm, GCL_HCURSOR, (LONG_PTR)hCursor_hand);
+        SendMessage(hwndEnterAlarm, WM_SETFONT, (WPARAM)buttonFontA, true);
+
+        alarmHour = CreateWindowEx(
+            0,
+            L"EDIT",
+            L"",
+            WS_BORDER | WS_CHILD | WS_VISIBLE | ES_NUMBER,
+            result_rect.right - 10 - 80 - 10 - 80,
+            result_rect.top + 10,
+            80,
+            28,
+            m_hwnd,
+            NULL,
+            (HINSTANCE)GetWindowLongPtr(m_hwnd, GWLP_HINSTANCE),
+            NULL
+        );
+        SendMessage(alarmHour, WM_SETFONT, (WPARAM)buttonFontA, true);
+        Edit_SetCueBannerText(alarmHour, L"Hour");
+
+        alarmMin = CreateWindowEx(
+            0,
+            L"EDIT",
+            L"",
+            WS_BORDER | WS_CHILD | WS_VISIBLE | ES_NUMBER,
+            result_rect.right - 10 - 80,
+            result_rect.top + 10,
+            80,
+            28,
+            m_hwnd,
+            NULL,
+            (HINSTANCE)GetWindowLongPtr(m_hwnd, GWLP_HINSTANCE),
+            NULL
+        );
+        SendMessage(alarmMin, WM_SETFONT, (WPARAM)buttonFontA, true);
+        Edit_SetCueBannerText(alarmMin, L"Min");
+
+        alarmDay = CreateWindowEx(
+            0,
+            WC_COMBOBOX,
+            L"",
+            WS_BORDER | WS_CHILD | WS_VISIBLE | CBS_DROPDOWN | CBS_HASSTRINGS,
+            result_rect.right - 15 - 140,
+            result_rect.top + 10 + 28 + 10, 
+            120,
+            28,
+            m_hwnd,
+            NULL,
+            (HINSTANCE)GetWindowLongPtr(m_hwnd, GWLP_HINSTANCE),
+            NULL
+        );
+        SendMessage(alarmDay, WM_SETFONT, (WPARAM)buttonFontA, true);
+        ComboBox_SetCueBannerText(alarmDay, L"Day");
+        TCHAR A_days[16];
+        int k_days;
+        TCHAR Days[7][10] =
+        {
+            TEXT("Sunday"),
+            TEXT("Monday"),
+            TEXT("Tuesday"),
+            TEXT("Wednesday"),
+            TEXT("Thursday"),
+            TEXT("Friday"),
+            TEXT("Saturday")
+        };
+        memset(&A_days, 0, sizeof(A_days));
+        for (k_days = 0; k_days <= 6; k_days += 1)
+        {
+            wcscpy_s(A_days, sizeof(A_days) / sizeof(TCHAR), (TCHAR*)Days[k_days]);
+
+            SendMessage(alarmDay, (UINT)CB_ADDSTRING, (WPARAM)0, (LPARAM)A_days);
+        }
+
+        alarmAMPM = CreateWindowEx(
+            0,
+            WC_COMBOBOX,
+            L"",
+            WS_BORDER | WS_CHILD | WS_VISIBLE | CBS_DROPDOWN | CBS_HASSTRINGS,
+            result_rect.right - 15 - 140,
+            result_rect.top + 10 + 28 + 10 + 28 +10,
+            120,
+            28,
+            m_hwnd,
+            NULL,
+            (HINSTANCE)GetWindowLongPtr(m_hwnd, GWLP_HINSTANCE),
+            NULL
+        );
+        SendMessage(alarmAMPM, WM_SETFONT, (WPARAM)buttonFontA, true);
+        ComboBox_SetCueBannerText(alarmAMPM, L"AM/PM");
+        TCHAR A_ap[16];
+        int k_ap;
+        TCHAR AMPM[2][3] =
+        {
+            TEXT("AM"),
+            TEXT("PM")
+        };
+        memset(&A_ap, 0, sizeof(A_ap));
+        for (k_ap = 0; k_ap <= 1; k_ap += 1)
+        {
+            wcscpy_s(A_ap, sizeof(A_ap) / sizeof(TCHAR), (TCHAR*)AMPM[k_ap]);
+
+            SendMessage(alarmAMPM, (UINT)CB_ADDSTRING, (WPARAM)0, (LPARAM)A_ap);
+        }
+
+        hwndCloseAlarm = CreateWindowEx(
+            0,
+            L"Button",
+            L"Close",
+            WS_BORDER | WS_CHILD | WS_VISIBLE | ES_AUTOHSCROLL,
+            result_rect.left + 10 - (((x - (result_rect.left * 2) - 60) / 3) / 4) + (((x - (result_rect.left * 2) - 60) / 3) / 4),
+            result_rect.bottom - 38,
+            ((x - (result_rect.left * 2) - 60) / 3) / 2,
+            28,
+            m_hwnd,
+            NULL,
+            (HINSTANCE)GetWindowLongPtr(m_hwnd, GWLP_HINSTANCE),
+            NULL
+        );
+        SetClassLongPtr(hwndCloseAlarm, GCL_HCURSOR, (LONG_PTR)hCursor_hand);
+        SendMessage(hwndCloseAlarm, WM_SETFONT, (WPARAM)buttonFontA, true);
+
+        ArrangeAlarms();
+    }
     else
     {
         alarmButton = CreateWindowEx(
@@ -734,6 +877,87 @@ void MainWindow::ArrangeShortcuts()
     }
 }
 
+// This Fucntion Arranges Alarms On The ResultRect
+
+void MainWindow::ArrangeAlarms()
+{
+    string checkNull = "";
+    if (alarms_data["alarm1"]["day"].get<string>().compare(checkNull) == 0) {
+        totalNoOfAlarms = 0;
+    }
+    else if (alarms_data["alarm2"]["day"].get<string>().compare(checkNull) == 0) {
+        totalNoOfAlarms = 1;
+    }
+    else if (alarms_data["alarm3"]["day"].get<string>().compare(checkNull) == 0) {
+        totalNoOfAlarms = 2;
+    }
+    else if (alarms_data["alarm4"]["day"].get<string>().compare(checkNull) == 0) {
+        totalNoOfAlarms = 3;
+    }
+    else {
+        totalNoOfAlarms = 4;
+    }
+
+    int item_no = 1;
+
+    while (item_no <= totalNoOfAlarms)
+    {
+        wstring buttonName;
+
+        if (item_no == 1) {
+            wstring day = s2ws(alarms_data["alarm1"]["day"].get<string>());
+            wstring hour = s2ws(alarms_data["alarm1"]["hour"].get<string>());
+            wstring min = s2ws(alarms_data["alarm1"]["min"].get<string>());
+            wstring ampm = s2ws(alarms_data["alarm1"]["AMPM"].get<string>());            
+            bool reapeat = alarms_data["alarm1"]["repeat"].get<bool>();  
+            buttonName = day + (wstring)L"," + hour + (wstring)L":" + min + (wstring)L" " + ampm;
+        }
+        if (item_no == 2) {
+            wstring day = s2ws(alarms_data["alarm2"]["day"].get<string>());
+            wstring hour = s2ws(alarms_data["alarm2"]["hour"].get<string>());
+            wstring min = s2ws(alarms_data["alarm2"]["min"].get<string>());
+            wstring ampm = s2ws(alarms_data["alarm2"]["AMPM"].get<string>());
+            bool reapeat = alarms_data["alarm2"]["repeat"].get<bool>();
+            buttonName = day + (wstring)L"," + hour + (wstring)L":" + min + (wstring)L" " + ampm;
+        }
+        if (item_no == 3) {
+            wstring day = s2ws(alarms_data["alarm3"]["day"].get<string>());
+            wstring hour = s2ws(alarms_data["alarm3"]["hour"].get<string>());
+            wstring min = s2ws(alarms_data["alarm3"]["min"].get<string>());
+            wstring ampm = s2ws(alarms_data["alarm3"]["AMPM"].get<string>());
+            bool reapeat = alarms_data["alarm3"]["repeat"].get<bool>();
+            buttonName = day + (wstring)L"," + hour + (wstring)L":" + min + (wstring)L" " + ampm;
+        }
+        if (item_no == 4) {
+            wstring day = s2ws(alarms_data["alarm4"]["day"].get<string>());
+            wstring hour = s2ws(alarms_data["alarm4"]["hour"].get<string>());
+            wstring min = s2ws(alarms_data["alarm4"]["min"].get<string>());
+            wstring ampm = s2ws(alarms_data["alarm4"]["AMPM"].get<string>());
+            bool reapeat = alarms_data["alarm4"]["repeat"].get<bool>();
+            buttonName = day + (wstring)L"," + hour + (wstring)L":" + min + (wstring)L" " + ampm;
+        }
+
+        dAlarm = CreateWindowEx(
+            0,
+            L"BUTTON",
+            (LPWSTR)buttonName.c_str(),
+            WS_TABSTOP | WS_VISIBLE | WS_CHILD | BS_PUSHBUTTON | BS_FLAT,
+            GetAlarmPositions(1, item_no, totalNoOfAlarms),
+            GetAlarmPositions(2, item_no, totalNoOfAlarms),
+            200,
+            28,
+            m_hwnd,
+            (HMENU)(item_no + 20),     // To Check Which Button Is Pushed
+            (HINSTANCE)GetWindowLongPtr(m_hwnd, GWLP_HINSTANCE),
+            NULL
+        );
+        SendMessage(dAlarm, WM_SETFONT, (WPARAM)buttonFontA, true);
+        SetClassLongPtr(dAlarm, GCL_HCURSOR, (LONG_PTR)hCursor_hand);
+
+        item_no = item_no + 1;
+    }
+}
+
 // Function To Show Add Shortcut Details
 
 void MainWindow::ShowNewShortcut()
@@ -745,7 +969,18 @@ void MainWindow::ShowNewShortcut()
     ShowButtons();
 }
 
-// This Function Finds Positions Of Different shortcuts
+// Function To Show Alarm Details
+
+void MainWindow::ShowAlarm()
+{
+    DestroyBasicButtons();
+    DestroyShortcuts();
+    DestroyNewShortcutsButtons();
+    ifNewAlarms = true;
+    ShowButtons();
+}
+
+// This Function Finds Positions Of Different Shortcuts
 
 int MainWindow::GetShortcutPositions(int axis, int item_no, int totalNoOfShortcuts)
 {
@@ -755,18 +990,39 @@ int MainWindow::GetShortcutPositions(int axis, int item_no, int totalNoOfShortcu
     int heightOfRect = y - (y / 5) - (y / 4);
     int widthOfRect = x - (x / 10) - (x / 10);
 
-    int a = (heightOfRect - (80))/(2);   // For Y Axis
+    int a = (heightOfRect - (80)) / (2);   // For Y Axis
     int b = (widthOfRect - (80 * totalNoOfShortcuts)) / (totalNoOfShortcuts + 1);   // For X Axis
-    
-    if (axis == 1) 
+
+    if (axis == 1)
     {
-         int d = (x / 10) + (b * item_no) + (80 * (item_no - 1));
-         return d;
+        int d = (x / 10) + (b * item_no) + (80 * (item_no - 1));
+        return d;
     }
     else
     {
         int f = (y / 4) + (a);
         return f;
+    }
+}
+
+// This Function Finds Positions Of Different Alarms
+
+int MainWindow::GetAlarmPositions(int axis, int item_no, int totalNoOfAlarms)
+{
+    // Using a formula to get the value
+    // Margin between buttons = Total empty space (Excluding buttons) / Total no. of buttons + 1
+
+    int heightOfRect = y - (y / 5) - (y / 4);
+    int widthOfRect = x - (x / 10) - (x / 10);
+
+    if (axis == 1)
+    {
+        return result_rect.left + (widthOfRect/30);
+    }
+    else
+    {
+        int f = (heightOfRect - (28 * totalNoOfAlarms) - 38 ) / (totalNoOfAlarms + 1);
+        return result_rect.top + (28 * (item_no - 1)) + (f * (item_no));
     }
 }
 
@@ -852,6 +1108,11 @@ void MainWindow::OnPaint()
             DiscardDeviceIndependentResources();
         }
     }
+
+    if (ifNewAlarms == true)
+    {
+
+    }
 }
 
 // Change Positions When Resize
@@ -875,7 +1136,7 @@ void MainWindow::Resize()
     }
 }
 
-// To Remove A Json Field
+// To Remove A Json Field From Shortcuts
 
 string MainWindow::RemoveJsonFeild(int itemNo, int field)
 {
@@ -1023,6 +1284,7 @@ void MainWindow::DestroyShortcuts()
     DestroyWindow(GetDlgItem(m_hwnd, 5));
     DestroyWindow(GetDlgItem(m_hwnd, 6));
     DestroyWindow(GetDlgItem(m_hwnd, 7));
+
     DestroyWindow(GetDlgItem(m_hwnd, 11));
     DestroyWindow(GetDlgItem(m_hwnd, 12));
     DestroyWindow(GetDlgItem(m_hwnd, 13));
@@ -1030,7 +1292,21 @@ void MainWindow::DestroyShortcuts()
     DestroyWindow(GetDlgItem(m_hwnd, 15));
     DestroyWindow(GetDlgItem(m_hwnd, 16));
     DestroyWindow(GetDlgItem(m_hwnd, 17));
+
+    DestroyWindow(GetDlgItem(m_hwnd, 21));
+    DestroyWindow(GetDlgItem(m_hwnd, 22));
+    DestroyWindow(GetDlgItem(m_hwnd, 23));
+    DestroyWindow(GetDlgItem(m_hwnd, 24));
+    DestroyWindow(GetDlgItem(m_hwnd, 25));
+
     DestroyWindow(alarmButton);
+    DestroyWindow(hwndEnterAlarm);
+    DestroyWindow(hwndCloseAlarm);
+    DestroyWindow(alarmMin);
+    DestroyWindow(alarmHour);
+    DestroyWindow(alarmAMPM);
+    DestroyWindow(alarmDay);
+    DestroyWindow(alarmRepeat);
 }
 
 void MainWindow::DestroyNewShortcutsButtons()
@@ -1073,8 +1349,12 @@ LRESULT MainWindow::HandleMessage(UINT uMsg, WPARAM wParam, LPARAM lParam)
             return -1;
         }
 
-        ifstream ifs("shortcuts.json");
-        shortcuts_data = json::parse(ifs);
+        ifstream ifs_sh("shortcuts.json");
+        shortcuts_data = json::parse(ifs_sh);
+
+        ifstream ifs_al("alarms.json");
+        alarms_data = json::parse(ifs_al);
+
         HICON hIcon = (HICON)LoadImage(NULL, L"Assistant.ico", IMAGE_ICON, 0, 0, LR_LOADFROMFILE);
         SendMessage(m_hwnd, WM_SETICON, ICON_SMALL, (LPARAM)hIcon);
         SendMessage(m_hwnd, WM_SETICON, ICON_BIG, (LPARAM)hIcon);
@@ -1198,7 +1478,7 @@ LRESULT MainWindow::HandleMessage(UINT uMsg, WPARAM wParam, LPARAM lParam)
 
             ShowNewShortcut();
         }
-        if (LOWORD(wParam) >= 11)
+        if (LOWORD(wParam) >= 11 && LOWORD(wParam) < 20)
         {
             thread thread_obj(speakOutput, (LPWSTR)L"Do You Want To Delete The Selected Shortcut ?");
             thread_obj.detach();
@@ -1389,7 +1669,11 @@ LRESULT MainWindow::HandleMessage(UINT uMsg, WPARAM wParam, LPARAM lParam)
 
             if ((HWND)lParam == alarmButton) 
             {
-
+                DestroyBasicButtons();
+                DestroyShortcuts();
+                DestroyNewShortcutsButtons();
+                ifNewAlarms = true;
+                ShowButtons();
             }
 
             if ((HWND)lParam == hwndEnter)

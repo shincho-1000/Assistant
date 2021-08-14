@@ -1,17 +1,17 @@
 {
   "alarm1": {
-    "day": "",
-    "hour": "",
-    "min": "",
-    "AMPM": "",
+    "day": "Mon",
+    "hour": "1",
+    "min": "30",
+    "AMPM": "PM",
     "repeat": false
   },
 
   "alarm2": {
-    "day": "",
-    "hour": "",
-    "min": "",
-    "AMPM": "",
+    "day": "Tue",
+    "hour": "6",
+    "min": "40",
+    "AMPM": "Am",
     "repeat": false
   },
 
