@@ -1485,7 +1485,7 @@ void MainWindow::checkChangeInTime()
 void MainWindow::startAlarm() 
 {
     ShowWindow(m_hwnd, SW_SHOWNORMAL);
-    if (MessageBox(m_hwnd, L"Alarm", L"Alarm", MB_OK) == IDOK)
+    if (MessageBox(m_hwnd, L"Click OK To Dismiss", L"Alarm", MB_OK) == IDOK)
     {
         alarmFunc = false;
     }
