@@ -157,6 +157,12 @@
     <None Include="shortcuts.json" />
     <None Include="ShortcutsData.json" />
   </ItemGroup>
+  <ItemGroup>
+    <Media Include="..\..\..\..\Downloads\alarm.mp3" />
+  </ItemGroup>
+  <ItemGroup>
+    <ResourceCompile Include="resource.rc" />
+  </ItemGroup>
   <Import Project="$(VCTargetsPath)\Microsoft.Cpp.targets" />
   <ImportGroup Label="ExtensionTargets">
     <Import Project="..\packages\Microsoft.CognitiveServices.Speech.1.17.0\build\native\Microsoft.CognitiveServices.Speech.targets" Condition="Exists('..\packages\Microsoft.CognitiveServices.Speech.1.17.0\build\native\Microsoft.CognitiveServices.Speech.targets')" />

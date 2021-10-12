@@ -40,6 +40,20 @@ template <class T> void SafeRelease(T** ppT)
     }
 }
 
+// Converts Strings To WStrings
+
+wstring s2ws(const string& s)
+{
+    int len;
+    int slength = (int)s.length() + 1;
+    len = MultiByteToWideChar(CP_ACP, 0, s.c_str(), slength, 0, 0);
+    wchar_t* buf = new wchar_t[len];
+    MultiByteToWideChar(CP_ACP, 0, s.c_str(), slength, buf, len);
+    wstring r(buf);
+    delete[] buf;
+    return r;
+}
+
 // Play Music
 
 bool musicFunc;
@@ -57,11 +71,36 @@ int playMusic(LPWSTR file)
 
     while (musicFunc == true)
     {
-        
+        Sleep(1000);
     }
 
     musicFunc = false;
     mciSendString(L"close mp3", NULL, 0, NULL);
+
+    return true;
+}
+
+// Text To Speech
+
+int speakOutput(LPWSTR output)
+{
+    if (musicFunc == false)
+    {
+        ISpVoice* pVoice = NULL;
+
+        if (FAILED(::CoInitialize(NULL)))
+            return false;
+
+        HRESULT hr = CoCreateInstance(CLSID_SpVoice, NULL, CLSCTX_ALL, IID_ISpVoice, (void**)&pVoice);
+        if (SUCCEEDED(hr))
+        {
+            hr = pVoice->Speak(output, 0, NULL);
+
+            pVoice->Release();
+            pVoice = NULL;
+        }
+        ::CoUninitialize();
+    }
 
     return true;
 }
@@ -95,6 +134,80 @@ int checkTime(int data)
     }
 }
 
+bool alarmFunc;
+
+int checkAlarms(string no)
+{
+    ifstream ifs_al("alarms.json");
+    json alarms_data = json::parse(ifs_al);
+
+    if (alarms_data[no]["day"].get<string>() == (string)"") { return 0; }
+
+    int hour;
+    int min = stoi(alarms_data[no]["min"].get<string>());
+    int day;
+
+    if ((alarms_data[no]["day"].get<string>()).find("Sun") != string::npos) { day = 0; }
+    else if ((alarms_data[no]["day"].get<string>()).find("Mon") != string::npos) { day = 1; }
+    else if ((alarms_data[no]["day"].get<string>()).find("Tue") != string::npos) { day = 2; }
+    else if ((alarms_data[no]["day"].get<string>()).find("Wed") != string::npos) { day = 3; }
+    else if ((alarms_data[no]["day"].get<string>()).find("Thurs") != string::npos) { day = 4; }
+    else if ((alarms_data[no]["day"].get<string>()).find("Fri") != string::npos) { day = 5; }
+    else if ((alarms_data[no]["day"].get<string>()).find("Sat") != string::npos) { day = 6; }
+
+    if (alarms_data[no]["AMPM"].get<string>() == (string)"AM")
+    {
+        hour = stoi(alarms_data[no]["hour"].get<string>());
+        if (hour == 12)
+        {
+            hour = 0;
+        }
+    }
+    else if (alarms_data[no]["AMPM"].get<string>() == (string)"PM")
+    {
+        hour = stoi(alarms_data[no]["hour"].get<string>()) + 12;
+        if (hour == 24)
+        {
+            hour = 12;
+        }
+    }
+    else
+    {
+
+    }
+
+    if ((checkTime(1) == hour) && (checkTime(2) == min) && (checkTime(4) == day))
+    {
+        string pathMusic = alarms_data[no]["path"].get<string>();
+
+        alarmFunc = true;
+
+        wstring filePath;
+        wstring w1(L"open \"");
+        wstring w2(s2ws(pathMusic));
+        wstring w3(L"\" type mpegvideo alias mp3");
+        filePath = w1 + w2 + w3;
+        const wchar_t* path = filePath.c_str();
+
+        mciSendString(path, NULL, 0, NULL);
+        mciSendString(L"play mp3", NULL, 0, NULL);
+
+        while (alarmFunc == true)
+        {
+            Sleep(1000);
+        }
+
+        alarmFunc = false;
+        mciSendString(L"close mp3", NULL, 0, NULL);
+    }
+    else
+    {
+
+    }
+
+    return 0;
+}
+
 LPWSTR greeting()
 {
     int hour = checkTime(1);
@@ -109,45 +222,6 @@ LPWSTR greeting()
     else {
         return (LPWSTR)L"Good Evening, I am your assistant";
     }
-}
-
-// Text To Speech
-
-int speakOutput(LPWSTR output)
-{
-    if (musicFunc == false)
-    {
-        ISpVoice* pVoice = NULL;
-
-        if (FAILED(::CoInitialize(NULL)))
-            return false;
-
-        HRESULT hr = CoCreateInstance(CLSID_SpVoice, NULL, CLSCTX_ALL, IID_ISpVoice, (void**)&pVoice);
-        if (SUCCEEDED(hr))
-        {
-            hr = pVoice->Speak(output, 0, NULL);
-
-            pVoice->Release();
-            pVoice = NULL;
-        }
-        ::CoUninitialize();
-    }
-
-    return true;
-}
-
-// Converts Strings To WStrings
-
-wstring s2ws(const string& s)
-{
-    int len;
-    int slength = (int)s.length() + 1;
-    len = MultiByteToWideChar(CP_ACP, 0, s.c_str(), slength, 0, 0);
-    wchar_t* buf = new wchar_t[len];
-    MultiByteToWideChar(CP_ACP, 0, s.c_str(), slength, buf, len);
-    wstring r(buf);
-    delete[] buf;
-    return r;
 }
 
 // Creating MainWindow Class
@@ -202,7 +276,8 @@ class MainWindow : public BaseWindow<MainWindow>
     HWND alarmHour;
     HWND alarmAMPM;
     HWND alarmDay;
-    HWND alarmRepeat;
+    HWND alarmMusicPath;
+    HWND alarmMusicPathBrowse;
     HWND hwndEnterAlarm;
     HWND hwndCloseAlarm;
 
@@ -237,9 +312,8 @@ class MainWindow : public BaseWindow<MainWindow>
     void    DestroyBasicButtons();
     void    DestroyShortcuts();
     void    DestroyNewShortcutsButtons();
-    void    DestroyAlarmsButtons();
     string  RemoveJsonFeild(int itemNo, int field);
-    string  RemoveJsonFeildAl(int itemNo, int field);
+    string  RemoveJsonFeildAl(string no, string item);
     HRESULT CreateGraphicsResources();
     HRESULT CreateDeviceIndependentResources();
 
@@ -250,7 +324,8 @@ public:
     }
 
     void checkChangeInTime();
-    PCWSTR  ClassName() const { return L"Circle Window Class"; }
+    void startAlarm();
+    PCWSTR  ClassName() const { return L"Assistant Window Class"; }
     LRESULT HandleMessage(UINT uMsg, WPARAM wParam, LPARAM lParam);
 };
 
@@ -552,7 +627,7 @@ void MainWindow::ShowButtons()
 
         hwndEnterShortcut = CreateWindowEx(
             0,
-            L"Button",
+            L"BUTTON",
             L"Submit",
             WS_BORDER | WS_CHILD | WS_VISIBLE | ES_AUTOHSCROLL,
             result_rect.left + 30 + (x - (result_rect.left * 2) - 60) / 3,
@@ -569,7 +644,7 @@ void MainWindow::ShowButtons()
 
         hwndCloseShortcut = CreateWindowEx(
             0,
-            L"Button",
+            L"BUTTON",
             L"Close",
             WS_BORDER | WS_CHILD | WS_VISIBLE | ES_AUTOHSCROLL,
             result_rect.left + 30 + (x - (result_rect.left * 2) - 60) / 3 + ((x - (result_rect.left * 2) - 60) / 3) / 2,
@@ -588,9 +663,9 @@ void MainWindow::ShowButtons()
     {
         hwndEnterAlarm = CreateWindowEx(
             0,
-            L"Button",
+            L"BUTTON",
             L"Submit",
-            WS_BORDER | WS_CHILD | WS_VISIBLE | ES_AUTOHSCROLL,
+            WS_BORDER | WS_CHILD | WS_VISIBLE,
             result_rect.right - 10 - (((x - (result_rect.left * 2) - 60) / 3) / 4) - (((x - (result_rect.left * 2) - 60) / 3) / 4),
             result_rect.bottom - 38,
             ((x - (result_rect.left * 2) - 60) / 3) / 2,
@@ -609,7 +684,7 @@ void MainWindow::ShowButtons()
             L"",
             WS_BORDER | WS_CHILD | WS_VISIBLE | ES_NUMBER,
             result_rect.right - 10 - 80 - 10 - 80,
-            result_rect.top + 10,
+            result_rect.top + y / 28,
             80,
             28,
             m_hwnd,
@@ -626,7 +701,7 @@ void MainWindow::ShowButtons()
             L"",
             WS_BORDER | WS_CHILD | WS_VISIBLE | ES_NUMBER,
             result_rect.right - 10 - 80,
-            result_rect.top + 10,
+            result_rect.top + y / 28,
             80,
             28,
             m_hwnd,
@@ -643,7 +718,7 @@ void MainWindow::ShowButtons()
             L"",
             WS_BORDER | WS_CHILD | WS_VISIBLE | CBS_DROPDOWN | CBS_HASSTRINGS,
             result_rect.right - 15 - 140,
-            result_rect.top + 10 + 28 + 10, 
+            result_rect.top + (y / 28) * 2 + 28,
             120,
             28,
             m_hwnd,
@@ -669,7 +744,6 @@ void MainWindow::ShowButtons()
         for (k_days = 0; k_days <= 6; k_days += 1)
         {
             wcscpy_s(A_days, sizeof(A_days) / sizeof(TCHAR), (TCHAR*)Days[k_days]);
-
             SendMessage(alarmDay, (UINT)CB_ADDSTRING, (WPARAM)0, (LPARAM)A_days);
         }
 
@@ -679,7 +753,7 @@ void MainWindow::ShowButtons()
             L"",
             WS_BORDER | WS_CHILD | WS_VISIBLE | CBS_DROPDOWN | CBS_HASSTRINGS,
             result_rect.right - 15 - 140,
-            result_rect.top + 10 + 28 + 10 + 28 +10,
+            result_rect.top + (y / 28) * 3 + 28 + 28,
             120,
             28,
             m_hwnd,
@@ -700,15 +774,48 @@ void MainWindow::ShowButtons()
         for (k_ap = 0; k_ap <= 1; k_ap += 1)
         {
             wcscpy_s(A_ap, sizeof(A_ap) / sizeof(TCHAR), (TCHAR*)AMPM[k_ap]);
-
             SendMessage(alarmAMPM, (UINT)CB_ADDSTRING, (WPARAM)0, (LPARAM)A_ap);
         }
 
+        alarmMusicPath = CreateWindowEx(
+            0,
+            L"EDIT",
+            L"",
+            WS_BORDER | WS_CHILD | WS_VISIBLE | ES_AUTOHSCROLL,
+            result_rect.right - 15 - 280 - 100,
+            result_rect.top + (y / 28) * 4 + 28 + 28 + 28,
+            280,
+            28,
+            m_hwnd,
+            NULL,
+            (HINSTANCE)GetWindowLongPtr(m_hwnd, GWLP_HINSTANCE),
+            NULL
+        );
+        SendMessage(alarmMusicPath, WM_SETFONT, (WPARAM)buttonFontA, true);
+        Edit_SetCueBannerText(alarmMusicPath, L"Path Of The Music");
+
+        alarmMusicPathBrowse = CreateWindowEx(
+            0,
+            L"BUTTON",
+            L"Browse",
+            WS_BORDER | WS_CHILD | WS_VISIBLE,
+            result_rect.right - 15 - 180 + 80,
+            result_rect.top + (y / 28) * 4 + 28 + 28 + 28,
+            80,
+            28,
+            m_hwnd,
+            NULL,
+            (HINSTANCE)GetWindowLongPtr(m_hwnd, GWLP_HINSTANCE),
+            NULL
+        );
+        SetClassLongPtr(alarmMusicPathBrowse, GCL_HCURSOR, (LONG_PTR)hCursor_hand);
+        SendMessage(alarmMusicPathBrowse, WM_SETFONT, (WPARAM)buttonFontA, true);
+
         hwndCloseAlarm = CreateWindowEx(
             0,
-            L"Button",
+            L"BUTTON",
             L"Close",
-            WS_BORDER | WS_CHILD | WS_VISIBLE | ES_AUTOHSCROLL,
+            WS_BORDER | WS_CHILD | WS_VISIBLE,
             result_rect.left + 10 - (((x - (result_rect.left * 2) - 60) / 3) / 4) + (((x - (result_rect.left * 2) - 60) / 3) / 4),
             result_rect.bottom - 38,
             ((x - (result_rect.left * 2) - 60) / 3) / 2,
@@ -908,8 +1015,7 @@ void MainWindow::ArrangeAlarms()
             wstring day = s2ws(alarms_data["alarm1"]["day"].get<string>());
             wstring hour = s2ws(alarms_data["alarm1"]["hour"].get<string>());
             wstring min = s2ws(alarms_data["alarm1"]["min"].get<string>());
-            wstring ampm = s2ws(alarms_data["alarm1"]["AMPM"].get<string>());            
-            bool reapeat = alarms_data["alarm1"]["repeat"].get<bool>();  
+            wstring ampm = s2ws(alarms_data["alarm1"]["AMPM"].get<string>()); 
             buttonName = day + (wstring)L"," + hour + (wstring)L":" + min + (wstring)L" " + ampm;
         }
         if (item_no == 2) {
@@ -917,7 +1023,6 @@ void MainWindow::ArrangeAlarms()
             wstring hour = s2ws(alarms_data["alarm2"]["hour"].get<string>());
             wstring min = s2ws(alarms_data["alarm2"]["min"].get<string>());
             wstring ampm = s2ws(alarms_data["alarm2"]["AMPM"].get<string>());
-            bool reapeat = alarms_data["alarm2"]["repeat"].get<bool>();
             buttonName = day + (wstring)L"," + hour + (wstring)L":" + min + (wstring)L" " + ampm;
         }
         if (item_no == 3) {
@@ -925,7 +1030,6 @@ void MainWindow::ArrangeAlarms()
             wstring hour = s2ws(alarms_data["alarm3"]["hour"].get<string>());
             wstring min = s2ws(alarms_data["alarm3"]["min"].get<string>());
             wstring ampm = s2ws(alarms_data["alarm3"]["AMPM"].get<string>());
-            bool reapeat = alarms_data["alarm3"]["repeat"].get<bool>();
             buttonName = day + (wstring)L"," + hour + (wstring)L":" + min + (wstring)L" " + ampm;
         }
         if (item_no == 4) {
@@ -933,7 +1037,6 @@ void MainWindow::ArrangeAlarms()
             wstring hour = s2ws(alarms_data["alarm4"]["hour"].get<string>());
             wstring min = s2ws(alarms_data["alarm4"]["min"].get<string>());
             wstring ampm = s2ws(alarms_data["alarm4"]["AMPM"].get<string>());
-            bool reapeat = alarms_data["alarm4"]["repeat"].get<bool>();
             buttonName = day + (wstring)L"," + hour + (wstring)L":" + min + (wstring)L" " + ampm;
         }
 
@@ -1108,11 +1211,6 @@ void MainWindow::OnPaint()
             DiscardDeviceIndependentResources();
         }
     }
-
-    if (ifNewAlarms == true)
-    {
-
-    }
 }
 
 // Change Positions When Resize
@@ -1262,6 +1360,40 @@ string MainWindow::RemoveJsonFeild(int itemNo, int field)
     return returnVal;
 }
 
+
+// To Remove A Json Field From Alarms
+
+string MainWindow::RemoveJsonFeildAl(string no, string item)
+{
+    string returnVal;
+
+    if (totalNoOfAlarms == 1 && no != "alarm1")
+    {
+        returnVal = "";
+    }
+    else if (totalNoOfAlarms == 2 && no != "alarm2")
+    {
+        returnVal = alarms_data["alarm2"][item].get<string>();
+        alarms_data["alarm2"][item] = "";
+    }
+    else if (totalNoOfAlarms == 3 && no != "alarm3")
+    {
+        returnVal = alarms_data["alarm3"][item].get<string>();
+        alarms_data["alarm3"][item] = "";
+    }
+    else if (totalNoOfAlarms == 4 && no != "alarm4")
+    {
+        returnVal = alarms_data["alarm4"][item].get<string>();
+        alarms_data["alarm4"][item] = "";
+    }
+    else
+    {
+        returnVal = "";
+    }
+
+    return returnVal;
+}
+
 // Destroying Buttons
 
 void MainWindow::DestroyBasicButtons() 
@@ -1306,7 +1438,8 @@ void MainWindow::DestroyShortcuts()
     DestroyWindow(alarmHour);
     DestroyWindow(alarmAMPM);
     DestroyWindow(alarmDay);
-    DestroyWindow(alarmRepeat);
+    DestroyWindow(alarmMusicPath);
+    DestroyWindow(alarmMusicPathBrowse);
 }
 
 void MainWindow::DestroyNewShortcutsButtons()
@@ -1324,13 +1457,37 @@ void MainWindow::checkChangeInTime()
 {
     int hour = checkTime(1);
     int min = checkTime(2);
+
     while (true) {
         int new_min = checkTime(2);
         if (min != new_min) {
             hour = checkTime(1);
             min = checkTime(2);
+            thread thread_obj_al1(checkAlarms, "alarm1");
+            thread_obj_al1.detach();
+            thread thread_obj_al2(checkAlarms, "alarm2");
+            thread_obj_al2.detach();
+            thread thread_obj_al3(checkAlarms, "alarm3");
+            thread_obj_al3.detach();
+            thread thread_obj_al4(checkAlarms, "alarm4");
+            thread_obj_al4.detach();
             RedrawWindow(m_hwnd, NULL, NULL, RDW_INVALIDATE);
+            Sleep(3000);
         }
+
+        if (alarmFunc == true)
+        {
+            startAlarm();
+        }
+    }
+}
+
+void MainWindow::startAlarm() 
+{
+    ShowWindow(m_hwnd, SW_SHOWNORMAL);
+    if (MessageBox(m_hwnd, L"Alarm", L"Alarm", MB_OK) == IDOK)
+    {
+        alarmFunc = false;
     }
 }
 
@@ -1363,6 +1520,7 @@ LRESULT MainWindow::HandleMessage(UINT uMsg, WPARAM wParam, LPARAM lParam)
         webFunc = false;
         googleFunc = false;
         musicFunc = false;
+        alarmFunc = false;
 
         thread thread_obj_time_check(&MainWindow::checkChangeInTime, this);
         thread_obj_time_check.detach();
@@ -1371,6 +1529,15 @@ LRESULT MainWindow::HandleMessage(UINT uMsg, WPARAM wParam, LPARAM lParam)
 
         thread thread_obj_greeting(speakOutput, greeting());
         thread_obj_greeting.detach();
+
+        thread thread_obj_al1(checkAlarms, "alarm1");
+        thread_obj_al1.detach();
+        thread thread_obj_al2(checkAlarms, "alarm2");
+        thread_obj_al2.detach();
+        thread thread_obj_al3(checkAlarms, "alarm3");
+        thread_obj_al3.detach();
+        thread thread_obj_al4(checkAlarms, "alarm4");
+        thread_obj_al4.detach();
 
         return 0;
     }
@@ -1390,11 +1557,24 @@ LRESULT MainWindow::HandleMessage(UINT uMsg, WPARAM wParam, LPARAM lParam)
 
     // When Close Button Is Clicked
     case WM_CLOSE:
-        if (MessageBox(m_hwnd, L"Do You Want To Exit ?", L"Assistant", MB_OKCANCEL) == IDOK)
+    {
+        int ifClose = MessageBox(m_hwnd, L"Do You Want To Hide Assistant ( If Cancelled App Will Close But Alarms Won't Work ) ?", L"Assistant", MB_OKCANCEL);
+
+        if (ifClose == IDCANCEL)
         {
             DestroyWindow(m_hwnd);
         }
+        else if (ifClose == IDOK)
+        {
+            ShowWindow(m_hwnd, SW_HIDE);
+        }
+        else
+        {
+
+        }
+
         return 0;
+    }
 
     // Sets The Cursor When Mouse Moves
     case WM_MOUSEMOVE:
@@ -1578,6 +1758,62 @@ LRESULT MainWindow::HandleMessage(UINT uMsg, WPARAM wParam, LPARAM lParam)
                 thread_obj.detach();
             }
         }
+        if (LOWORD(wParam) > 20)
+        {
+            if (LOWORD(wParam) == 21)
+            {
+                if (MessageBox(m_hwnd, L"Do You Want To Delete The Selected Alarm ?", L"Assistant", MB_OKCANCEL) == IDOK)
+                {
+                    alarms_data["alarm1"]["day"] = RemoveJsonFeildAl("alarm1", "day");
+                    alarms_data["alarm1"]["hour"] = RemoveJsonFeildAl("alarm1", "hour");
+                    alarms_data["alarm1"]["min"] = RemoveJsonFeildAl("alarm1", "min");
+                    alarms_data["alarm1"]["AMPM"] = RemoveJsonFeildAl("alarm1", "AMPM");
+                    alarms_data["alarm1"]["path"] = RemoveJsonFeildAl("alarm1", "path");
+                }
+            }
+            if (LOWORD(wParam) == 22)
+            {
+                if (MessageBox(m_hwnd, L"Do You Want To Delete The Selected Alarm ?", L"Assistant", MB_OKCANCEL) == IDOK)
+                {
+                    alarms_data["alarm2"]["day"] = RemoveJsonFeildAl("alarm2", "day");
+                    alarms_data["alarm2"]["hour"] = RemoveJsonFeildAl("alarm2", "hour");
+                    alarms_data["alarm2"]["min"] = RemoveJsonFeildAl("alarm2", "min");
+                    alarms_data["alarm2"]["AMPM"] = RemoveJsonFeildAl("alarm2", "AMPM");
+                    alarms_data["alarm2"]["path"] = RemoveJsonFeildAl("alarm2", "path");
+                }
+            }
+            if (LOWORD(wParam) == 23)
+            {
+                if (MessageBox(m_hwnd, L"Do You Want To Delete The Selected Alarm ?", L"Assistant", MB_OKCANCEL) == IDOK)
+                {
+                    alarms_data["alarm3"]["day"] = RemoveJsonFeildAl("alarm3", "day");
+                    alarms_data["alarm3"]["hour"] = RemoveJsonFeildAl("alarm3", "hour");
+                    alarms_data["alarm3"]["min"] = RemoveJsonFeildAl("alarm3", "min");
+                    alarms_data["alarm3"]["AMPM"] = RemoveJsonFeildAl("alarm3", "AMPM");
+                    alarms_data["alarm3"]["path"] = RemoveJsonFeildAl("alarm3", "path");
+                }
+            }
+            if (LOWORD(wParam) == 24)
+            {
+                if (MessageBox(m_hwnd, L"Do You Want To Delete The Selected Alarm ?", L"Assistant", MB_OKCANCEL) == IDOK)
+                {
+                    alarms_data["alarm4"]["day"] = "";
+                    alarms_data["alarm4"]["hour"] = "";
+                    alarms_data["alarm4"]["min"] = "";
+                    alarms_data["alarm4"]["AMPM"] = "";
+                    alarms_data["alarm4"]["path"] = "";
+                }
+            }
+
+            ofstream ob("alarms.json");
+            ob << alarms_data;
+
+            DestroyBasicButtons();
+            DestroyShortcuts();
+            DestroyNewShortcutsButtons();
+            ShowButtons();
+        }
+
         switch (wParam)
         {
         case BN_CLICKED:
@@ -1673,6 +1909,146 @@ LRESULT MainWindow::HandleMessage(UINT uMsg, WPARAM wParam, LPARAM lParam)
                 DestroyShortcuts();
                 DestroyNewShortcutsButtons();
                 ifNewAlarms = true;
+                ShowButtons();
+            }
+
+            if ((HWND)lParam == alarmMusicPathBrowse)
+            {
+                HRESULT hr = CoInitializeEx(NULL, COINIT_APARTMENTTHREADED |
+                    COINIT_DISABLE_OLE1DDE);
+                if (SUCCEEDED(hr))
+                {
+                    IFileOpenDialog* pFileOpen;
+
+                    // Create the FileOpenDialog object.
+                    hr = CoCreateInstance(CLSID_FileOpenDialog, NULL, CLSCTX_ALL,
+                        IID_IFileOpenDialog, reinterpret_cast<void**>(&pFileOpen));
+
+                    if (SUCCEEDED(hr))
+                    {
+                        // Show the Open dialog box.
+                        hr = pFileOpen->Show(NULL);
+
+                        // Get the file name from the dialog box.
+                        if (SUCCEEDED(hr))
+                        {
+                            IShellItem* pItem;
+                            hr = pFileOpen->GetResult(&pItem);
+                            if (SUCCEEDED(hr))
+                            {
+                                PWSTR pszFilePath;
+                                hr = pItem->GetDisplayName(SIGDN_FILESYSPATH, &pszFilePath);
+
+                                // Display the file name to the user.
+                                if (SUCCEEDED(hr))
+                                {
+                                    SendMessage(alarmMusicPath, WM_SETTEXT, 0, (LPARAM)pszFilePath);
+                                    MessageBoxW(NULL, pszFilePath, L"File Path", MB_OK);
+                                    CoTaskMemFree(pszFilePath);
+                                }
+                                pItem->Release();
+                            }
+                        }
+                        pFileOpen->Release();
+                    }
+                }
+            }
+
+            if ((HWND)lParam == hwndEnterAlarm)
+            {
+                int cTextLenHour = GetWindowTextLength(alarmHour);
+                PSTR pszMemHour = (PSTR)VirtualAlloc((LPVOID)NULL,
+                    (DWORD)(cTextLenHour + 1), MEM_COMMIT,
+                    PAGE_READWRITE);
+                GetWindowText(alarmHour, (LPWSTR)pszMemHour, cTextLenHour + 1);
+                wstring hourW((LPWSTR)pszMemHour);
+                string hourS(hourW.begin(), hourW.end());
+
+                int cTextLenMin = GetWindowTextLength(alarmMin);
+                PSTR pszMemMin = (PSTR)VirtualAlloc((LPVOID)NULL,
+                    (DWORD)(cTextLenMin + 1), MEM_COMMIT,
+                    PAGE_READWRITE);
+                GetWindowText(alarmMin, (LPWSTR)pszMemMin, cTextLenMin + 1);
+                wstring minW((LPWSTR)pszMemMin);
+                string minS(minW.begin(), minW.end());
+
+                int cTextLenDay = GetWindowTextLength(alarmDay);
+                PSTR pszMemDay = (PSTR)VirtualAlloc((LPVOID)NULL,
+                    (DWORD)(cTextLenDay + 1), MEM_COMMIT,
+                    PAGE_READWRITE);
+                GetWindowText(alarmDay, (LPWSTR)pszMemDay, cTextLenDay + 1);
+                wstring dayW((LPWSTR)pszMemDay);
+                string dayS(dayW.begin(), dayW.end());
+
+                int cTextLenAMPM = GetWindowTextLength(alarmAMPM);
+                PSTR pszMemAMPM = (PSTR)VirtualAlloc((LPVOID)NULL,
+                    (DWORD)(cTextLenAMPM + 1), MEM_COMMIT,
+                    PAGE_READWRITE);
+                GetWindowText(alarmAMPM, (LPWSTR)pszMemAMPM, cTextLenAMPM + 1);
+                wstring ampmW((LPWSTR)pszMemAMPM);
+                string ampmS(ampmW.begin(), ampmW.end());
+
+                int cTextLenMusicPath = GetWindowTextLength(alarmMusicPath);
+                PSTR pszMemMusicPath = (PSTR)VirtualAlloc((LPVOID)NULL,
+                    (DWORD)(cTextLenMusicPath + 1), MEM_COMMIT,
+                    PAGE_READWRITE);
+                GetWindowText(alarmMusicPath, (LPWSTR)pszMemMusicPath, cTextLenMusicPath + 1);
+                wstring musicPathW((LPWSTR)pszMemMusicPath);
+                string musicPathS(musicPathW.begin(), musicPathW.end());
+
+                ofstream ob("alarms.json");
+
+                if (minS.length() == 1)
+                {
+                    minS = "0" + minS;
+                }
+
+                if (totalNoOfAlarms == 0) {
+                    alarms_data["alarm1"]["day"] = dayS;
+                    alarms_data["alarm1"]["hour"] = hourS;
+                    alarms_data["alarm1"]["min"] = minS;
+                    alarms_data["alarm1"]["AMPM"] = ampmS;
+                    alarms_data["alarm1"]["path"] = musicPathS;
+                }
+                else if (totalNoOfAlarms == 1) {
+                    alarms_data["alarm2"]["day"] = dayS;
+                    alarms_data["alarm2"]["hour"] = hourS;
+                    alarms_data["alarm2"]["min"] = minS;
+                    alarms_data["alarm2"]["AMPM"] = ampmS;
+                    alarms_data["alarm2"]["path"] = musicPathS;
+                }
+                else if (totalNoOfAlarms == 2) {
+                    alarms_data["alarm3"]["day"] = dayS;
+                    alarms_data["alarm3"]["hour"] = hourS;
+                    alarms_data["alarm3"]["min"] = minS;
+                    alarms_data["alarm3"]["AMPM"] = ampmS;
+                    alarms_data["alarm3"]["path"] = musicPathS;
+                }
+                else if (totalNoOfAlarms == 3) {
+                    alarms_data["alarm4"]["day"] = dayS;
+                    alarms_data["alarm4"]["hour"] = hourS;
+                    alarms_data["alarm4"]["min"] = minS;
+                    alarms_data["alarm4"]["AMPM"] = ampmS;
+                    alarms_data["alarm4"]["path"] = musicPathS;
+                }
+                else {
+
+                }
+                ob << alarms_data;
+
+                ifNewAlarms = false;
+                DestroyBasicButtons();
+                DestroyShortcuts();
+                DestroyNewShortcutsButtons();
+                ShowButtons();
+            }
+
+            if ((HWND)lParam == hwndCloseAlarm)
+            {
+                DestroyBasicButtons();
+                DestroyShortcuts();
+                DestroyNewShortcutsButtons();
+                ifNewAlarms = false;
                 ShowButtons();
             }
 
@@ -1804,6 +2180,7 @@ LRESULT MainWindow::HandleMessage(UINT uMsg, WPARAM wParam, LPARAM lParam)
                     }
                 }
             }
+
             if ((HWND)lParam == inputSymbolBrowse)
             {
                 HRESULT hr = CoInitializeEx(NULL, COINIT_APARTMENTTHREADED |
@@ -1845,6 +2222,7 @@ LRESULT MainWindow::HandleMessage(UINT uMsg, WPARAM wParam, LPARAM lParam)
                     }
                 }
             }
+
             if ((HWND)lParam == hwndEnterShortcut)
             {
                 int cTextLenName = GetWindowTextLength(inputName);
@@ -1978,20 +2356,28 @@ LRESULT MainWindow::HandleMessage(UINT uMsg, WPARAM wParam, LPARAM lParam)
 int WINAPI wWinMain(HINSTANCE hInstance, HINSTANCE, PWSTR, int nCmdShow)
 {
     MainWindow win;
-
-    if (!win.Create(L"Assistant", WS_OVERLAPPEDWINDOW | WS_CLIPCHILDREN))
+    CreateMutex(NULL, TRUE, L"AssistantMutex038");
+    if (GetLastError() == ERROR_ALREADY_EXISTS)
     {
-        return 0;
+        HWND existingApp = FindWindow(L"Assistant Window Class", L"Assistant");
+        ShowWindow(existingApp, SW_SHOWMAXIMIZED);
+    }
+    else 
+    {
+        if (!win.Create(L"Assistant", WS_OVERLAPPEDWINDOW | WS_CLIPCHILDREN))
+        {
+            return 0;
+        }
+
+        ShowWindow(win.Window(), nCmdShow);
+
+        MSG msg = { };
+        while (GetMessage(&msg, NULL, 0, 0))
+        {
+            TranslateMessage(&msg);
+            DispatchMessage(&msg);
+        }
     }
 
-    ShowWindow(win.Window(), nCmdShow);
-
-    MSG msg = { };
-    while (GetMessage(&msg, NULL, 0, 0))
-    {
-        TranslateMessage(&msg);
-        DispatchMessage(&msg);
-    }
-
-    return 0;
+    return TRUE;
 }
